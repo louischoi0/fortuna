@@ -1,4 +1,4 @@
-module github.com/louischoi0/fortuna
+module fortuna
 
 go 1.24.2
 
