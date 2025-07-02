@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fortuna/core"
+	"github.com/spf13/cobra"
 )
 
 
@@ -11,12 +12,14 @@ func CreateNodeStartCmd() *cobra.Command {
 		Use:   "run",
                 Short: "",
                 RunE: func(cmd *cobra.Command, args []string) error {
-			n := core.NewBasicNode()
+			n := core.NewBasicNode("test")
 			n.Init()
-		}
+			return nil
+		},
 	}
 
 	cmd.Flags().StringP("port", "p", "4427", "pair")
+	return cmd
 }
 
 func CreateNodeCMD() *cobra.Command {

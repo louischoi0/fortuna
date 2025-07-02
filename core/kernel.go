@@ -39,24 +39,31 @@ func (hk *BasicHashKernel) StringToSeed(payload string) (int64, error) {
 
 type StateKernel interface {
 	GenVector(seed int64, size int64) []float64
-	GenIndex(size int64, minValue int64, maxValue int64) []int64
-	RandInt(minValue int64, maxValue int64) int64
+	GenIndex(seed, size, minValue, maxValue int64) []int64
+	RandInt(seed int64, minValue int64, maxValue int64) int64
+	GenNodeStateSeed() (int64, string)
+	VerifyNodeStateSeed(seed int64, payload string) bool
 }
 
 type BasicStateKernel struct {}
 
-func (ck *BasicStateKernel) GenIndex(size int64, minValue int64, maxValue int64) []int64 {
-	rand.Seed(time.Now().UnixNano())
+func (ck *BasicStateKernel) GenIndex(seed, size, minValue, maxValue int64) []int64 {
 	indices := make([]int64, size)
 
 	for i:= range(size) {
-		indices[i] = ck.RandInt(seed, minValue, maxValue)
+		indices[i] = ck.RandInt(seed+i, minValue, maxValue)
 	}
 	return indices
 }
 
-func (ck *BasicStateKernel) GenVector(size int64) []float64 {
-	rand.Seed(time.Now().UnixNano())
+func (ck *BasicStateKernel) GenNodeStateSeed() (int64, string) {
+	payload := string(time.Now().UnixNano())
+	hk := &BasicHashKernel{}
+	seed, _ := hk.StringToSeed(payload)
+	return seed, payload
+}
+
+func (ck *BasicStateKernel) GenVector(seed int64, size int64) []float64 {
 	vec := make([]float64, size)
 
 	for i := range(size) {
@@ -71,4 +78,8 @@ func (ck *BasicStateKernel) RandInt(seed int64, s int64, e int64) int64 {
         	s, e = e, s
     	}
     	return int64(rand.Intn(int(e-s+1))) + s
+}
+
+func (ck *BasicStateKernel) VerifyNodeStateSeed(seed int64, payload string) bool {
+	return true
 }

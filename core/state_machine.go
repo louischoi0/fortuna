@@ -11,9 +11,9 @@ type StateMachine struct {
 func NewBasicStateMachine(SpaceID string) *StateMachine {
 	machine := &StateMachine{
 		SpaceID: SpaceID,
+		StateKernel: &BasicStateKernel{},
+		HashKernel: &BasicHashKernel{},
 	}
-	machine.SetStateKernel(BasicStateKernel{})
-	machine.SetHashKernel(BasicHashKernel{})
 	return machine
 }
 
@@ -21,12 +21,9 @@ func (machine *StateMachine) PreExecuteTransaction(state []float64, tx interface
 	return nil, nil
 }
 
-func (machine *StateMachine) SetStateKernel(k StateKernel) {
-	machine.StateKernel = k
-}
-
-func (machine *StateMachine) SetHashKernel(k HashKernel) {
-	machine.HashKernel = k
+func (machine *StateMachine) GetNodeState(size int64) ([]float64, string) {
+	stateSeed, payload := machine.StateKernel.GenNodeStateSeed()
+	return machine.StateKernel.GenVector(stateSeed, size), payload
 }
 
 

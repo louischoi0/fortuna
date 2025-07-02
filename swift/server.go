@@ -2,7 +2,13 @@ package swift
 
 import (
 	"sync"
+	"fmt"
+	"context"
 	"net"
+	"io"
+	"time"
+	"encoding/binary"
+	"encoding/json"
 )
 
 
@@ -12,7 +18,37 @@ type TCPServer struct {
 	handlers      map[PacketType]func(ctx context.Context, packet *Packet) error
 	peers         map[string]net.Conn
 	listener      net.Listener
+	
+	host	      	string
+	port	      	int
+	address		string
+
 	mu            sync.RWMutex
+}
+
+func NewServer() *TCPServer {
+
+	return &TCPServer {
+		host:	"0.0.0.0",
+		peers:         make(map[string]net.Conn),
+		mu:       sync.RWMutex{},
+		handlers: make(map[PacketType]func(ctx context.Context, packet *Packet) error),
+	}
+}
+
+func (s *TCPServer) Start(port int) error {
+	var err error
+	s.address = fmt.Sprintf("%v:%v", s.host, port)
+	
+	s.listener, err = net.Listen("tcp", s.address)
+
+	if err != nil {
+		return err
+	}
+
+	go s.acceptConnections()
+
+	return nil
 }
 
 func (s *TCPServer) acceptConnections() {
@@ -23,6 +59,106 @@ func (s *TCPServer) acceptConnections() {
 		}
 		go s.HandleConnection(conn)
 	}
+}
+
+func (s *TCPServer) HandleConnection(conn net.Conn) error {
+	if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		return fmt.Errorf("failed to set read deadline: %v", err)
+	}
+
+	ctx := context.WithValue(context.Background(), "connection", conn)
+
+	for {
+		header := make([]byte, 4)
+		if _, err := io.ReadFull(conn, header); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf("failed to read header: %v", err)
+		}
+
+		packetLen := binary.BigEndian.Uint32(header)
+		packetBytes := make([]byte, packetLen)
+
+		if _, err := io.ReadFull(conn, packetBytes); err != nil {
+			return fmt.Errorf("failed to read packet: %v", err)
+		}
+
+		var packet Packet
+		if err := json.Unmarshal(packetBytes, &packet); err != nil {
+			return fmt.Errorf("failed to parse packet: %v", err)
+		}
+
+		switch packet.Type {
+		case PacketTypePing:
+			if err := s.Send(ctx, &Packet{
+				Type:    PacketTypePong,
+				Payload: json.RawMessage(`"pong"`),
+			}); err != nil {
+				return fmt.Errorf("failed to send pong response: %v", err)
+			}
+			continue
+		default:
+			if handler, ok := s.handlers[packet.Type]; ok {
+				err := handler(ctx, &packet)
+
+				if err != nil {
+					return s.SendErrorResponse(ctx, err.Error())
+				}
+			} else {
+				return fmt.Errorf("unknown packet type: %v", packet.Type)
+			}
+		}
+	}
+}
+
+func (s *TCPServer) Send(ctx context.Context, packet *Packet) error {
+	// s.mu.RLock() defer s.mu.RUnlock()
+
+	connInfo, ok := ctx.Value("connection").(net.Conn)
+	if !ok || connInfo == nil {
+		return fmt.Errorf("connection info not found in context")
+	}
+
+	packetBytes, err := json.Marshal(packet)
+	if err != nil {
+		return fmt.Errorf("failed to serialize packet: %v", err)
+	}
+
+	header := make([]byte, 4)
+	binary.BigEndian.PutUint32(header, uint32(len(packetBytes)))
+
+	if _, err := connInfo.Write(header); err != nil {
+		return fmt.Errorf("failed to send header: %v", err)
+	}
+	if _, err := connInfo.Write(packetBytes); err != nil {
+		return fmt.Errorf("failed to send packet: %v", err)
+	}
+
+	return nil
+}
+
+func (s *TCPServer) SendErrorResponse(ctx context.Context, errMsg string) error {
+	errorPayload := struct {
+		Error string `json:"error"`
+	}{
+		Error: errMsg,
+	}
+
+	payload, err := json.Marshal(errorPayload)
+	if err != nil {
+		return fmt.Errorf("error message serialization failed: %v", err)
+	}
+	return s.Send(ctx, &Packet{
+		Type:    PacketTypeErrorResponse,
+		Payload: payload,
+	})
+}
+
+func (s *TCPServer) RegisterHandler(packetType PacketType, handler PacketHandler) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.handlers[packetType] = handler
 }
 
 
