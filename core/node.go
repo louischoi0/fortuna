@@ -1,12 +1,6 @@
 package core
 
-import (
-	"math/rand"
-	"crypto/sha256"
-	"encoding/hex"
-	"hash/fnv"
-	"time"
-)
+const BASIC_NODE_STATE_COUNT = 256
 
 type Node struct {
 	Epoch		int64
@@ -21,18 +15,16 @@ type Node struct {
 func NewBasicNode() *Node {
 	return &Node{
 		Epoch: 0,
-		State: make([]float64, stateCount),
+		State: make([]float64, BASIC_NODE_STATE_COUNT),
 		StateCount: 256,
-		StateKernel: &BasicStateKernel{},
-		HashKernel: &BasicHashKernel{},
 	}
 }
 
 func (n *Node) ResetState() {
-	n.State = n.StateKernel.GenVector(n.StateCount)
+	n.State = n.machine.StateKernel.GenVector(n.StateCount)
+	n.Epoch++
 }
 
 func (n *Node) Init() {
 	n.ResetState()
 }
-
