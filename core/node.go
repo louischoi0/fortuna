@@ -2,33 +2,26 @@ package core
 
 import (
 	"fortuna/swift"
+	"fortuna/core/vm"
 )
 
 const BASIC_NODE_STATE_COUNT = 256
 
-type Node struct {
+type Synapse struct {
 	Epoch		int64
-	State 		[]float64
-	StateHash	string	
-	StateCount	int64
-
-	machine		*StateMachine
-	streamer	interface{}
-
+	machines 	map[string]*vm.StateMachine
 	server		*swift.TCPServer
 }
 
-func NewBasicNode(spaceID string) *Node {
-	return &Node{
+func NewBasicSynapse(spaceID string) *Synapse {
+	return &Synapse{
 		Epoch: 0,
-		machine: NewBasicStateMachine(spaceID),
-		State: make([]float64, BASIC_NODE_STATE_COUNT),
+		machine: make(map[string]*vm.StateMachine),
 		server: swift.NewServer(),
-		StateCount: 256,
 	}
 }
 
-func (n *Node) ResetState() {
+func (n *Synapse) ResetMachineState(workspaceID string) {
 	var payload string
 
 	n.State, payload = n.machine.GetNodeState(n.StateCount)
@@ -39,7 +32,7 @@ func (n *Node) ResetState() {
 	}(payload)
 }
 
-func (n *Node) Init() {
+func (n *Synapse) Init() {
 	n.ResetState()
 
 }

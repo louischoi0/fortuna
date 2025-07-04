@@ -269,7 +269,7 @@ func serialize(builder *strings.Builder, value interface{}) error {
 			builder.WriteString("null")
 			return nil
 		}
-		return serialize(builder, *v) // Dereference and serialize
+		return serialize(builder, *v)
 	case OrderedMap:
 		builder.WriteString("{")
 		first := true
@@ -326,13 +326,13 @@ func parseArray(i *int, jsonStr string) (interface{}, error) {
 	if jsonStr[*i] != '[' {
 		return nil, errors.New("expected '[' at the beginning of array")
 	}
-	*i++ // '[' skipping character.
+	*i++ 
 	var array []interface{}
 
 	for *i < len(jsonStr) {
 		skipWhitespace(i, jsonStr)
 		if jsonStr[*i] == ']' {
-			*i++ // ']' skipping character.
+			*i++ 
 			return array, nil
 		}
 
@@ -344,10 +344,11 @@ func parseArray(i *int, jsonStr string) (interface{}, error) {
 
 		skipWhitespace(i, jsonStr)
 		if jsonStr[*i] == ',' {
-			*i++ // ',' skipping character.
+			*i++ 
 		} else if jsonStr[*i] != ']' {
 			return nil, errors.New("expected ',' or ']' in array")
 		}
 	}
 	return nil, errors.New("unexpected end of JSON while parsing array")
 }
+
