@@ -1,7 +1,6 @@
-package rabbit
+package mq
 
 import (
-	// "errors"
 	"errors"
 	"log"
 	"sync"
@@ -30,12 +29,12 @@ func NewProducer(conn *RabbitMQ, exchange, routingKey string) (*Producer, error)
 
 	err = ch.ExchangeDeclare(
 		exchange,
-		"topic", // assumed topic exchange
-		true,    // durable
-		false,   // auto-delete
-		false,   // internal
-		true,    // no-wait
-		nil,     // args
+		"topic",
+		true,
+		false,
+		false,
+		true,
+		nil,
 	)
 	if err != nil {
 		return nil, err

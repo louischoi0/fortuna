@@ -2,18 +2,18 @@ package cmd
 
 import (
 	"fortuna/core"
+
 	"github.com/spf13/cobra"
 )
-
 
 func CreateNodeStartCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "run",
-                Short: "",
-                RunE: func(cmd *cobra.Command, args []string) error {
-			n := core.NewBasicNode("test")
-			n.Init()
+		Short: "start synapse",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			n := core.NewBasicSynapse("test")
+			n.Init("test")
 			return nil
 		},
 	}
@@ -23,13 +23,12 @@ func CreateNodeStartCmd() *cobra.Command {
 }
 
 func CreateNodeCMD() *cobra.Command {
-        cmd := &cobra.Command{
-                Use:   "node",
-                Short: "node management cli",
-        }
+	cmd := &cobra.Command{
+		Use:   "node",
+		Short: "node management cli",
+	}
 
-        cmd.AddCommand(CreateNodeStartCmd())
+	cmd.AddCommand(CreateNodeStartCmd())
 
-        return cmd
+	return cmd
 }
-

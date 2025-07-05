@@ -3,16 +3,16 @@ package vm
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"math/rand"
 	"hash/fnv"
-	"time"
+	"math/rand"
 	"strconv"
+	"time"
 )
 
 type KernelVersion string
 
 const (
-	BaseV000		KernelVersion = "base-v0.0.0"
+	BaseV000 KernelVersion = "base-v0.0.0"
 )
 
 type StateKernel interface {
@@ -21,7 +21,8 @@ type StateKernel interface {
 	RandInt(seed int64, minValue int64, maxValue int64) int64
 
 	GenStateSeed() (int64, string)
-	
+	GetEventSeed(eventSpec *EventSpec) (int64, string)
+
 	VerifyNodeStateSeed(seed int64, payload string) bool
 	StringToSeed(payload string) (int64, error)
 
@@ -31,18 +32,18 @@ type StateKernel interface {
 
 func LoadKernel(version KernelVersion) StateKernel {
 	switch version {
-		case BaseV000:
+	case BaseV000:
 		return &BasicStateKernel{}
 	}
 	return nil
 }
 
-type BasicStateKernel struct {}
+type BasicStateKernel struct{}
 
 func (ck *BasicStateKernel) GenIndex(seed, size, minValue, maxValue int64) []int64 {
 	indices := make([]int64, size)
 
-	for i:= range(size) {
+	for i := range size {
 		indices[i] = ck.RandInt(seed+i, minValue, maxValue)
 	}
 	return indices
@@ -57,7 +58,7 @@ func (ck *BasicStateKernel) GenStateSeed() (int64, string) {
 func (ck *BasicStateKernel) GenVector(seed int64, size int64) []float64 {
 	vec := make([]float64, size)
 
-	for i := range(size) {
+	for i := range size {
 		vec[i] = rand.Float64()
 	}
 	return vec
@@ -66,9 +67,9 @@ func (ck *BasicStateKernel) GenVector(seed int64, size int64) []float64 {
 func (ck *BasicStateKernel) RandInt(seed int64, s int64, e int64) int64 {
 	rand.Seed(seed)
 	if s > e {
-        	s, e = e, s
-    	}
-    	return int64(rand.Intn(int(e-s+1))) + s
+		s, e = e, s
+	}
+	return int64(rand.Intn(int(e-s+1))) + s
 }
 
 func (ck *BasicStateKernel) VerifyNodeStateSeed(seed int64, payload string) bool {
@@ -100,10 +101,13 @@ func (hk *BasicStateKernel) StringToSeed(payload string) (int64, error) {
 func (hk *BasicStateKernel) HashState(state []float64) string {
 	acc := float64(0)
 
-	for idx := range(len(state)) {
+	for idx := range len(state) {
 		acc += state[idx] * float64(idx)
 	}
-	
+
 	return strconv.FormatFloat(acc, 'f', -1, 64)
 }
 
+func (hk *BasicStateKernel) GetEventSeed(eventSpec *EventSpec) (int64, string) {
+	return 1, "1"
+}

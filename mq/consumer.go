@@ -1,7 +1,8 @@
-package rabbit
+package mq
 
 import (
 	"log"
+
 	"github.com/streadway/amqp"
 )
 
