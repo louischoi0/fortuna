@@ -37,7 +37,11 @@ func NewBasicStateMachine(SpaceID string, stateCount int64, reset_chann chan *Re
 	return machine
 }
 
-func (machine *StateMachine) PreExecuteTransaction(state []float64, tx interface{}) (interface{}, error) {
+func (machine *StateMachine) EmitEventResult(event model.Event) (*model.EventExecutionResult, error) {
+
+}
+
+func (machine *StateMachine) ExecuteTransaction(state []float64, tx interface{}) (interface{}, error) {
 	return nil, nil
 }
 
@@ -54,3 +58,9 @@ func (machine *StateMachine) ResetState() (int64, string) {
 
 	return seed, hash
 }
+
+func (machine *StateMachine) VerifyMachineState() error {
+}
+
+
+

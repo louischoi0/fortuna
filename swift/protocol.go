@@ -14,6 +14,10 @@ const (
 	PacketTypePing			PacketType = 1
 	PacketTypePong			PacketType = 2
 	PacketTypeErrorResponse		PacketType = 9
+
+
+	PacketTypeEmitEvent		PacketType = 10
+
 )
 
 type Packet struct {

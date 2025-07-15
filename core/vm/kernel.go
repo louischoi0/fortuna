@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"fortuna/core/util"
 	"crypto/sha256"
 	"encoding/hex"
 	"math/rand"
@@ -17,12 +18,13 @@ const (
 
 type StateKernel interface {
 	GenVector(seed int64, size int64) []float64
+	VerifyVector(seed int64, vector []float64) error
 	GenIndex(seed, size, minValue, maxValue int64) []int64
 	RandInt(seed int64, minValue int64, maxValue int64) int64
 
 	GenStateSeed() (int64, string)
 	
-	VerifyNodeStateSeed(seed int64, payload string) bool
+	VerifySeed(seed int64, payload string) bool
 	StringToSeed(payload string) (int64, error)
 
 	Hash(data string) (string, error)
@@ -63,6 +65,19 @@ func (ck *BasicStateKernel) GenVector(seed int64, size int64) []float64 {
 	return vec
 }
 
+func (ck *BasicStateKernel) VerifyVector(seed int64, vec []float64) error {
+	r := rand.New(rand.NewSource(seed))
+	for i, v := range vec {
+		expected := r.Float64()
+
+		if !util.floatEquals(v, expected, 1e-9) {
+            		return fmt.Errorf("Mismatch at index %d: expected %v, got %v", i, expected, v)
+        	}
+	}
+	return nil
+}
+
+
 func (ck *BasicStateKernel) RandInt(seed int64, s int64, e int64) int64 {
 	rand.Seed(seed)
 	if s > e {
@@ -71,7 +86,7 @@ func (ck *BasicStateKernel) RandInt(seed int64, s int64, e int64) int64 {
     	return int64(rand.Intn(int(e-s+1))) + s
 }
 
-func (ck *BasicStateKernel) VerifyNodeStateSeed(seed int64, payload string) bool {
+func (ck *BasicStateKernel) VerifySeed(seed int64, payload string) bool {
 	return true
 }
 

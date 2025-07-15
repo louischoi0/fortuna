@@ -2,6 +2,7 @@ package model
 
 import (
 	"fortuna/structure"
+	"fmt"
 )
 
 type Identity struct {
@@ -10,15 +11,45 @@ type Identity struct {
 	UserID			string	`json:"user_id"`
 }
 
-type EventInterface struct {
-	InterfaceID	int64		`json:"protocol_id"`
-	InterfaceName	string		`json:"protocol_name"`
+type EventSpec struct {
+	InterfaceID	int			`json:"interface_id"`
+	Version		string			`json:"version"`
+	Params		*structure.OrderedMap	`json:"params"`
 }
 
-type EventSpec struct {
-	Protocol	EventInterface		`json:"protocol"`
-	// KernelVersion	KernelVersion		`json:"kernel_version"`
-	Params		*structure.OrderedMap	`json:"param0"`
+func NewEventSpecFromMap(data *structure.OrderedMap) (*EventSpec, error) {
+	interface_id, ok := data.Get("interface_id")
+	if !ok {
+		return nil, fmt.Errorf("event spec must have interface_id")
+	}
+
+	interface_id, ok = interface_id.(int)
+	if !ok {
+		return nil, fmt.Errorf("interface_id must have type: integer")
+	}
+
+	version, ok := data.Get("version")
+	if !ok {
+		return nil, fmt.Errorf("event spec must have version")
+	}
+
+	params, ok := data.Get("params")
+	if !ok {
+		return nil, fmt.Errorf("event spec must have params")
+	}
+
+	params, ok = params.(*structure.OrderedMap)
+	if !ok {
+		return nil, fmt.Errorf("params must have type: ordered map")
+	}
+
+	spec := EventSpec{
+		InterfaceID: interface_id.(int),
+		Version: version.(string),
+		Params: params.(*structure.OrderedMap),
+	}
+
+	return &spec, nil
 }
 
 type Event struct {
@@ -32,6 +63,68 @@ type Event struct {
 	SubTopic	string			`json:"subtopic"`
 	Seperator	string			`json:"seperator"`
 	Tag		string			`json:"tag"`
+}
+
+func (event *Event) Buffer() string {
+	return ""
+}
+
+func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
+	payload, ok := data.Get("payload")
+	if !ok {
+		return nil, fmt.Errorf("event data must have key:payload")
+	}
+
+	payload_s, ok := payload.(*structure.OrderedMap)
+	if !ok {
+		return nil, fmt.Errorf("payload must have type: string")
+	}
+
+	spaceID, ok := data.Get("space_id")
+	if !ok {
+		return nil, fmt.Errorf("event data must have key:space_id")
+	}
+
+	spaceID_s, ok := spaceID.(string)
+	if !ok {
+		return nil, fmt.Errorf("spaceID must have type: string")
+	}
+
+	_, ok = data.Get("publisher")
+	if !ok {
+		return nil, fmt.Errorf("event data must have key:publisher")
+	}
+
+	specData, ok := data.Get("spec")
+	if !ok {
+		return nil, fmt.Errorf("event data must have key:spec")
+	}
+
+	specData_s, ok := specData.(*structure.OrderedMap)
+
+	topic, ok := data.Get("topic")
+	if !ok {
+		return nil, fmt.Errorf("event data must have key:topic")
+	}
+
+	topic_s, ok := topic.(string)
+	if !ok {
+		return nil, fmt.Errorf("topic must have type: string")
+	}
+
+	spec, err := NewEventSpecFromMap(specData_s)
+	if err != nil {
+		return nil, err
+	}
+
+	event := Event{
+		SpaceID: spaceID_s,
+		Spec: *spec,
+		Payload: payload_s,
+		Topic: topic_s,
+	}
+
+	return &event, nil
 }
 
 type EventExecutionError struct {
