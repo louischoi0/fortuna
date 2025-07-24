@@ -5,6 +5,8 @@ import (
 	"net"
 	"strings"
 	"encoding/json"
+	"log"
+	"bytes"
 )
 
 type PacketType uint8
@@ -16,8 +18,8 @@ const (
 	PacketTypeErrorResponse		PacketType = 9
 
 
-	PacketTypeEmitEvent		PacketType = 10
-
+	PacketTypeEmitEventRequest	PacketType = 10
+	PacketTypeEmitEventResponse	PacketType = 11
 )
 
 type Packet struct {
@@ -46,4 +48,14 @@ func ParseRemoteAddr(addr string) (string, string, string, error) {
 	}
 
 	return fmt.Sprintf("%s:%s", host, port), host, port, nil
+}
+
+func FormatResponse(payload *json.RawMessage) string {
+        var prettyJSON bytes.Buffer
+
+        if err := json.Indent(&prettyJSON, *payload, "", "    "); err != nil {
+                log.Fatalf("JSON formatting failed: %v", err)
+                return ""
+        }
+        return prettyJSON.String()
 }

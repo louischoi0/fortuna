@@ -3,6 +3,7 @@ package swift
 import (
 	"sync"
 	"fmt"
+	"log"
 	"context"
 	"net"
 	"io"
@@ -41,6 +42,7 @@ func (s *TCPServer) Start(port int) error {
 	s.address = fmt.Sprintf("%v:%v", s.host, port)
 	
 	s.listener, err = net.Listen("tcp", s.address)
+	log.Printf("start swift server %v", s.address)
 
 	if err != nil {
 		return err

@@ -19,5 +19,8 @@ func Execute() {
 // Execute sets up the CLI entry point
 func init() {
         nodeCMD := CreateNodeCMD()
+	eventCMD := CreateEventCMD()
+
         rootCmd.AddCommand(nodeCMD)
+	rootCmd.AddCommand(eventCMD)
 }

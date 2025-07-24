@@ -47,13 +47,11 @@ func (om *OrderedMap) Keys() []string {
 	return om.l
 }
 
-// ParseOrderedMap parses a JSON string into an OrderedMap
 func ParseOrderedMap(jsonStr string) (*OrderedMap, error) {
 	i := 0
 	return parseObject(&i, jsonStr)
 }
 
-// parseObject parses a JSON object into an OrderedMap
 func parseObject(i *int, jsonStr string) (*OrderedMap, error) {
 	skipWhitespace(i, jsonStr)
 
@@ -101,7 +99,6 @@ func parseObject(i *int, jsonStr string) (*OrderedMap, error) {
 	return om, nil
 }
 
-// parseValue parses a JSON value (string, number, object, boolean, null)
 func parseValue(i *int, jsonStr string) (interface{}, error) {
 	skipWhitespace(i, jsonStr)
 	if *i >= len(jsonStr) {

@@ -1,12 +1,18 @@
 package core
 
 import (
+	"encoding/json"
 	"fortuna/structure"
+	"fortuna/core/model"
+	"fortuna/swift"
+	"context"
+	"log"
 )
 
 func (syn *Synapse) StartUp() error {
 
         syn.swift.RegisterHandler(swift.PacketTypeEmitEventRequest, func(ctx context.Context, packet *swift.Packet) error {
+		log.Println("emit event requested")
 		omap, err := structure.ParseOrderedMap(string(packet.Payload))
 
 		if err != nil {
@@ -27,7 +33,8 @@ func (syn *Synapse) StartUp() error {
                         Payload: json.RawMessage(responseBuffer),
                 }
 
-                return o.swift.Send(ctx, response)
+                return syn.swift.Send(ctx, response)
         })
 
+	return nil
 }

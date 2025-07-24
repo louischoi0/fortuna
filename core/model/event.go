@@ -12,9 +12,36 @@ type Identity struct {
 }
 
 type EventSpec struct {
-	InterfaceID	int			`json:"interface_id"`
-	Version		string			`json:"version"`
+	InterfaceID	string			`json:"interface_id"`
+	KernelVersion	string			`json:"kernel_version"`
 	Params		*structure.OrderedMap	`json:"params"`
+}
+
+func NewEventSpec(interface_id string, kernel_version string, params *structure.OrderedMap) *EventSpec {
+	return &EventSpec{
+		InterfaceID: interface_id,
+		KernelVersion: kernel_version,
+		Params: params,
+	}
+}
+
+func (es *EventSpec) Buffer() []byte {
+	return []byte(es.String())
+}
+
+func (es *EventSpec) Map() *structure.OrderedMap {
+	om := structure.NewOrderedMap()
+
+	om.Set("interface_id", es.InterfaceID)
+	om.Set("version", es.KernelVersion)
+	om.Set("params", es.Params)
+	
+	return om
+}
+
+func (es *EventSpec) String() string {
+	om := es.Map()
+	return om.Ser()
 }
 
 func NewEventSpecFromMap(data *structure.OrderedMap) (*EventSpec, error) {
@@ -44,8 +71,8 @@ func NewEventSpecFromMap(data *structure.OrderedMap) (*EventSpec, error) {
 	}
 
 	spec := EventSpec{
-		InterfaceID: interface_id.(int),
-		Version: version.(string),
+		InterfaceID: interface_id.(string),
+		KernelVersion: version.(string),
 		Params: params.(*structure.OrderedMap),
 	}
 
@@ -53,20 +80,50 @@ func NewEventSpecFromMap(data *structure.OrderedMap) (*EventSpec, error) {
 }
 
 type Event struct {
-	Publisher 	Identity		`json:"publisher"`
+	// Publisher 	Identity		`json:"publisher"`
 	SpaceID		string			`json:"space_id"`
 
 	Payload		*structure.OrderedMap	`json:"payload"`
 	Spec		EventSpec		`json:"spec"`
 
 	Topic		string			`json:"topic"`	
-	SubTopic	string			`json:"subtopic"`
+	Subtopic	string			`json:"subtopic"`
 	Seperator	string			`json:"seperator"`
 	Tag		string			`json:"tag"`
 }
 
-func (event *Event) Buffer() string {
-	return ""
+func NewEventRequest(spaceID string, payload *structure.OrderedMap, spec *EventSpec, topic string, subtopic string, tag string) *Event{
+	return &Event{
+			SpaceID: spaceID,
+			Payload: payload,
+			Spec: *spec,
+			Topic: topic,
+			Subtopic: subtopic,
+			Tag: tag,
+	}
+}
+
+func (event *Event) Buffer() []byte {
+	return []byte(event.String())
+}
+
+func (event *Event) String() string {
+	return event.Map().Ser()
+}
+
+func (event *Event) Map() *structure.OrderedMap {
+	om := structure.NewOrderedMap()
+
+	// om.Set("publisher", event.Publisher)
+	om.Set("space_id", event.SpaceID)
+	om.Set("payload", event.Payload)
+	om.Set("spec", event.Spec.String())
+	om.Set("topic", event.Topic)
+	om.Set("subtopic", event.Subtopic)
+	om.Set("seperator", event.Seperator)
+	om.Set("tag", event.Tag)
+
+	return om
 }
 
 func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
@@ -133,9 +190,26 @@ type EventExecutionError struct {
 }
 
 type EventExecutionResult struct {
-	Event		*Event
-	Result		string
-	Err		*EventExecutionError
+	Event		*Event			`json:"event"`
+	Result		string			`json:"result"`
+	Err		*EventExecutionError	`json:"error"`
 }
 
+func (xr *EventExecutionResult) Buffer() []byte {
+	return []byte(xr.String())
+}
 
+func (xr *EventExecutionResult) String() string {
+	om := xr.Map()
+	return om.Ser()
+}
+
+func (xr *EventExecutionResult) Map() *structure.OrderedMap {
+	om := structure.NewOrderedMap()
+	
+	om.Set("event", xr.Event)
+	om.Set("result", xr.Result)
+	om.Set("error", xr.Err)
+
+	return om
+}
