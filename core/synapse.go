@@ -4,6 +4,7 @@ import (
 	"fortuna/swift"
 	"fortuna/core/vm"
 	"fortuna/core/model"
+	"fmt"
 	"log"
 	"os"
         "os/signal"
@@ -13,32 +14,64 @@ import (
 const BASIC_NODE_STATE_COUNT = 256
 
 type Synapse struct {
+	ID		string
+	SpaceID		string
 	Epoch		int64
 	EpochHash	string	
 
-	machines 	map[string]*vm.StateMachine
+	machines 	map[vm.KernelVersion]*vm.StateMachine
 
 	confirms 	[]*model.EventExecutionResult
 	swift *swift.TCPServer
 }
 
-func NewBasicSynapse(spaceID string) *Synapse {
+func NewSynapse(spaceID string) *Synapse {
+	
 	return &Synapse{
+		SpaceID: spaceID,
 		Epoch: 0,
-		machines: make(map[string]*vm.StateMachine),
+		machines: make(map[vm.KernelVersion]*vm.StateMachine),
 		confirms: make([]*model.EventExecutionResult, 0, 100),
 		swift: swift.NewServer(),
 	}
 }
 
+func (n *Synapse) InitMachines() error {
+	machine := vm.NewBasicStateMachine(n.SpaceID, 256)
+	machine.ResetState()
+	n.machines[vm.BaseV000] = machine
+
+	return nil
+}
+
 func (n *Synapse) LoadMachine(kernel vm.KernelVersion) (*vm.StateMachine, error) {
-	return nil, nil
+	machine, ok := n.machines[kernel]
+	
+	if !ok {
+		return nil, fmt.Errorf("no machine found for %v", kernel)
+	}
+
+	return machine, nil
 }
 
 func (n *Synapse) Confirm(request *model.Event) (*model.EventExecutionResult, error) {
-	er := model.EventExecutionResult{}
-	// machine, err := n.LoadMachine()
-	return &er, nil
+	machine, err := n.LoadMachine(vm.KernelVersion(request.Spec.KernelVersion))
+
+	if err != nil {
+		return nil, err
+	}
+
+	er, err := machine.EmitEventResult(request)
+
+	if er == nil {
+		return nil, fmt.Errorf("event result is nil")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return er, nil
 }
 
 func (n *Synapse) Commit(eventresult *model.EventExecutionResult) error {
@@ -54,9 +87,12 @@ func (n *Synapse) Init() {
 }
 
 func (n *Synapse) Run(port int) error {
+	if err := n.InitMachines(); err != nil {
+		log.Fatalf("Failed to init synapse: %v", err.Error())
+	}
 
 	if err := n.swift.Start(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("Failed to start server: %v", err.Error())
 	}
 
         sigChan := make(chan os.Signal, 1)

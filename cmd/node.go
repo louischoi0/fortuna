@@ -5,9 +5,10 @@ import (
 	"fortuna/core"
 	"fortuna/swift"
 	"fortuna/rpc"
-	"fmt"
 	"log"
 )
+
+const CLI_DEFAULT_ENDPOINT = "localhost:4277"
 
 func CreatePingRequestCMD() *cobra.Command {
 	cmd := &cobra.Command{
@@ -21,8 +22,8 @@ func CreatePingRequestCMD() *cobra.Command {
 				log.Fatalf(err.Error())
 			}
 
-			fmt.Printf(string(response.Payload))
-			// swift.FormatResponse(&response.Payload)
+			buffer := swift.FormatResponse(&response.Payload)
+			log.Println(buffer)
 
 			return nil
 		},
@@ -41,7 +42,7 @@ func CreateNodeStartCmd() *cobra.Command {
 			workspace, _ := cmd.Flags().GetString("workspace")
 			port, _ := cmd.Flags().GetInt("port")
 
-			syn := core.NewBasicSynapse(workspace)
+			syn := core.NewSynapse(workspace)
 			syn.StartUp()
 			syn.Run(port)
 	

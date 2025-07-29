@@ -1,14 +1,11 @@
 package vm
 
 import (
-	// "fortuna/core/util"
+	"fortuna/core/model"
+	"fortuna/crypto"
 	"crypto/sha256"
 	"encoding/hex"
-	"hash/fnv"
-	"math/rand"
-	"strconv"
 	"time"
-	"fmt"
 )
 
 type KernelVersion string
@@ -18,20 +15,19 @@ const (
 )
 
 type StateKernel interface {
-	GenVector(seed int64, size int64) []float64
-	VerifyVector(seed int64, vector []float64) error
-	GenIndex(seed, size, minValue, maxValue int64) []int64
-	RandInt(seed int64, minValue int64, maxValue int64) int64
+	GenVector(seed string, size int64) []int64
+	VerifyVector(seed string, vector []int64) bool
+	GenIndex(seed string, size, minValue, maxValue int64) []int64
+	RandInt(seed string, minValue int64, maxValue int64) int64
 
-	GenStateSeed() (int64, string)
-	VerifySeed(seed int64, payload string) bool
-	GetEventSeed(eventSpec *EventSpec) (int64, string)
+	GenStateSeed() (string, string)
+	GenStateSeedPayload(payload string) string
+	VerifySeed(seed string, payload string) bool
 
-	VerifyNodeStateSeed(seed int64, payload string) bool
-	StringToSeed(payload string) (int64, error)
+	GetEventHash(event *model.Event) (string, error)
 
 	Hash(data string) (string, error)
-	HashState(state []float64) string
+	// HashState(state []int64) string
 }
 
 func LoadKernel(version KernelVersion) StateKernel {
@@ -44,53 +40,53 @@ func LoadKernel(version KernelVersion) StateKernel {
 
 type BasicStateKernel struct{}
 
-func (ck *BasicStateKernel) GenIndex(seed, size, minValue, maxValue int64) []int64 {
-	indices := make([]int64, size)
+func (ck *BasicStateKernel) GenIndex(seed string, size, minValue, maxValue int64) []int64 {
+	res := make([]int64, size)
 
-	for i := range size {
-		indices[i] = ck.RandInt(seed+i, minValue, maxValue)
+	seed_bytes := []byte(seed)
+	rng := crypto.NewCSPRNG(seed_bytes)
+
+	for i := range(size) {
+		res[i] = rng.NextInt64()
 	}
-	return indices
+	return res
 }
 
-func (ck *BasicStateKernel) GenStateSeed() (int64, string) {
+func (ck *BasicStateKernel) GenStateSeedPayload(payload string) string {
+	return ""
+}
+
+func (ck *BasicStateKernel) GenStateSeed() (string, string) {
 	payload := string(time.Now().UnixNano())
-	seed, _ := ck.StringToSeed(payload)
+	seed := ck.GenStateSeedPayload(payload)
 	return seed, payload
 }
 
-func (ck *BasicStateKernel) GenVector(seed int64, size int64) []float64 {
-	vec := make([]float64, size)
-
-	for i := range size {
-		vec[i] = rand.Float64()
-	}
+func (ck *BasicStateKernel) GenVector(seed string, size int64) []int64 {
+	vec := make([]int64, size)
 	return vec
 }
 
-func (ck *BasicStateKernel) VerifyVector(seed int64, vec []float64) error {
-	r := rand.New(rand.NewSource(seed))
-	for i, v := range vec {
-		expected := r.Float64()
+func (ck *BasicStateKernel) VerifyVector(seed string, vec []int64) bool {
+	seed_bytes := []byte(seed)
+	rng := crypto.NewCSPRNG(seed_bytes)
 
-		if v != expected {
-            		return fmt.Errorf("Mismatch at index %d: expected %v, got %v", i, expected, v)
-        	}
+	for i := range(len(vec)) {
+		expected := rng.NextInt64()
 
+		if expected != vec[i] {
+			return false
+		}
 	}
-	return nil
+	return true
 }
 
 
-func (ck *BasicStateKernel) RandInt(seed int64, s int64, e int64) int64 {
-	rand.Seed(seed)
-	if s > e {
-		s, e = e, s
-	}
-	return int64(rand.Intn(int(e-s+1))) + s
+func (ck *BasicStateKernel) RandInt(seed string, s int64, e int64) int64 {
+	return 0
 }
 
-func (ck *BasicStateKernel) VerifySeed(seed int64, payload string) bool {
+func (ck *BasicStateKernel) VerifySeed(seed string, payload string) bool {
 	return true
 }
 
@@ -103,33 +99,11 @@ func (hk *BasicStateKernel) Hash(input string) (string, error) {
 	return hex.EncodeToString(hashedBytes), nil
 }
 
-func (hk *BasicStateKernel) StringToSeed(payload string) (int64, error) {
-	hasher := fnv.New64a()
-
-	_, err := hasher.Write([]byte(payload))
-	if err != nil {
-		return 0, err
-	}
-
-	hashValue := hasher.Sum64()
-
-	return int64(hashValue), nil
+func (hk *BasicStateKernel) HashState(state []int64) string {
+	return ""
 }
 
-func (hk *BasicStateKernel) HashState(state []float64) string {
-	acc := float64(0)
 
-	for idx := range len(state) {
-		acc += state[idx] * float64(idx)
-	}
-
-	return strconv.FormatFloat(acc, 'f', -1, 64)
-}
-
-func (hk *BasicStateKernel) GetEventSeed(eventSpec *EventSpec) (int64, string) {
-	return 1, "1"
-}
-
-func (sk *BasicStateKernel) VerifyNodeStateSeed(seed int64, payload string) bool {
-	return true
+func (sk *BasicStateKernel) GetEventHash(event *model.Event) (string ,error) {
+	return "thisiseventhash", nil
 }

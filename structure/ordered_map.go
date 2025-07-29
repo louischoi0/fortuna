@@ -40,6 +40,30 @@ func (om *OrderedMap) Get(key string) (interface{}, bool) {
 	return value, exists
 }
 
+func (om *OrderedMap) Int64(key string) (int64, bool) {
+	value, ok := om.Get(key)
+	if !ok {
+		return 0, false
+	} 
+	return value.(int64), true
+}
+
+func (om *OrderedMap) Int(key string) (int, bool) {
+	value, ok := om.Get(key)
+	if !ok {
+		return 0, false
+	} 
+	return value.(int), true
+}
+
+func (om *OrderedMap) String(key string) (string, bool) {
+	value, ok := om.Get(key)
+	if !ok {
+		return "", false
+	} 
+	return value.(string), true
+}
+
 func (om *OrderedMap) Keys() []string {
 	om.mu.RLock()
 	defer om.mu.RUnlock()

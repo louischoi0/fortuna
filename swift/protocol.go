@@ -20,6 +20,9 @@ const (
 
 	PacketTypeEmitEventRequest	PacketType = 10
 	PacketTypeEmitEventResponse	PacketType = 11
+
+	PacketTypeStateSeedAPIRequest	PacketType = 12
+	PacketTypeStateSeedAPIResponse	PacketType = 13
 )
 
 type Packet struct {

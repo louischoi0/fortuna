@@ -3,13 +3,11 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"fortuna/structure"
+	"fortuna/swift"
 	"fortuna/core/model"
-	// "fortuna/swift"
-	"log"
+	"fmt"
 	"fortuna/rpc"
 )
-
-const CLI_DEFAULT_ENDPOINT = "localhost:4277"
 
 func CreateEventEmitCMD() *cobra.Command {
         var interface_id 	string
@@ -27,6 +25,8 @@ func CreateEventEmitCMD() *cobra.Command {
 
 		Run: func(cmd *cobra.Command, args []string) {
 			params := structure.NewOrderedMap()
+			params.Set("slot_count", 2)
+
 			auth := ""
 			payload := structure.NewOrderedMap()
 
@@ -35,25 +35,22 @@ func CreateEventEmitCMD() *cobra.Command {
 
 			request := rpc.CreateEventRequest(endpoint, event, auth)
 
-			log.Println(request.Payload)
-			_, err := request.Call()
+			response, err := request.Call()
 
 			if err != nil {
-				log.Println("error: ", err.Error())
+				fmt.Println("error: ", err.Error())
 			}
-			/**
-			if err != nil {
-				swift.FormatResponse(&response.Payload)
-			} else {
-				log.Printf(err.Error())
+
+			if err == nil {
+				buf := swift.FormatResponse(&response.Payload)
+				fmt.Println(buf)
 			}
-			**/
 		},
         }
 
         cmd.Flags().StringVarP(&endpoint, "space_id", "s", "", "space id")
-        cmd.Flags().StringVarP(&interface_id, "interface_id", "i", "", "interface id")
-        cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "", "interface id")
+        cmd.Flags().StringVarP(&interface_id, "interface_id", "i", "FIC_001", "interface id")
+        cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base-v0.0.0", "interface id")
 
         cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
         cmd.Flags().StringVarP(&topic, "topic", "t", "", "topic")

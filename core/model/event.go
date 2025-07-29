@@ -13,7 +13,7 @@ type Identity struct {
 
 type EventSpec struct {
 	InterfaceID	string			`json:"interface_id"`
-	KernelVersion	string			`json:"kernel_version"`
+	KernelVersion	string 			`json:"kernel_version"`
 	Params		*structure.OrderedMap	`json:"params"`
 }
 
@@ -50,7 +50,7 @@ func NewEventSpecFromMap(data *structure.OrderedMap) (*EventSpec, error) {
 		return nil, fmt.Errorf("event spec must have interface_id")
 	}
 
-	interface_id, ok = interface_id.(int)
+	interface_id, ok = interface_id.(string)
 	if !ok {
 		return nil, fmt.Errorf("interface_id must have type: integer")
 	}
@@ -147,17 +147,28 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 		return nil, fmt.Errorf("spaceID must have type: string")
 	}
 
+	/**
 	_, ok = data.Get("publisher")
 	if !ok {
 		return nil, fmt.Errorf("event data must have key:publisher")
 	}
+	**/
 
 	specData, ok := data.Get("spec")
 	if !ok {
 		return nil, fmt.Errorf("event data must have key:spec")
 	}
 
-	specData_s, ok := specData.(*structure.OrderedMap)
+	_, ok = specData.(string)
+	if !ok {
+		return nil, fmt.Errorf("spec data must be string")
+	}
+
+	specData_s, err := structure.ParseOrderedMap(specData.(string))
+
+	if err != nil {
+		return nil, fmt.Errorf("spec data type conversion failed %v", err.Error())
+	}
 
 	topic, ok := data.Get("topic")
 	if !ok {
@@ -185,8 +196,15 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 }
 
 type EventExecutionError struct {
-	Code		int
-	Message 	string
+	Code		int	`json:"code"`
+	Message 	string	`json:"message"`
+}
+
+func (er *EventExecutionError) Map() *structure.OrderedMap {
+	om := structure.NewOrderedMap()
+	om.Set("code", er.Code)
+	om.Set("message", er.Message)
+	return om
 }
 
 type EventExecutionResult struct {
@@ -207,9 +225,13 @@ func (xr *EventExecutionResult) String() string {
 func (xr *EventExecutionResult) Map() *structure.OrderedMap {
 	om := structure.NewOrderedMap()
 	
-	om.Set("event", xr.Event)
+	// om.Set("event", xr.Event.Map())
 	om.Set("result", xr.Result)
-	om.Set("error", xr.Err)
+	if xr.Err != nil {
+		om.Set("error", xr.Err.Map())
+	} else {
+		om.Set("error", nil)
+	}
 
 	return om
 }
