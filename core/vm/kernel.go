@@ -1,10 +1,10 @@
 package vm
 
 import (
-	"fortuna/core/model"
-	"fortuna/crypto"
 	"crypto/sha256"
 	"encoding/hex"
+	"fortuna/core/model"
+	"fortuna/crypto"
 	"time"
 )
 
@@ -17,7 +17,6 @@ const (
 type StateKernel interface {
 	GenVector(seed string, size int64) []int64
 	VerifyVector(seed string, vector []int64) bool
-	GenIndex(seed string, size, minValue, maxValue int64) []int64
 	RandInt(seed string, minValue int64, maxValue int64) int64
 
 	GenStateSeed() (string, string)
@@ -40,18 +39,6 @@ func LoadKernel(version KernelVersion) StateKernel {
 
 type BasicStateKernel struct{}
 
-func (ck *BasicStateKernel) GenIndex(seed string, size, minValue, maxValue int64) []int64 {
-	res := make([]int64, size)
-
-	seed_bytes := []byte(seed)
-	rng := crypto.NewCSPRNG(seed_bytes)
-
-	for i := range(size) {
-		res[i] = rng.NextInt64()
-	}
-	return res
-}
-
 func (ck *BasicStateKernel) GenStateSeedPayload(payload string) string {
 	return ""
 }
@@ -63,15 +50,22 @@ func (ck *BasicStateKernel) GenStateSeed() (string, string) {
 }
 
 func (ck *BasicStateKernel) GenVector(seed string, size int64) []int64 {
-	vec := make([]int64, size)
-	return vec
+	res := make([]int64, size)
+
+	seed_bytes := []byte(seed)
+	rng := crypto.NewCSPRNG(seed_bytes)
+
+	for i := range size {
+		res[i] = rng.NextInt64()
+	}
+	return res
 }
 
 func (ck *BasicStateKernel) VerifyVector(seed string, vec []int64) bool {
 	seed_bytes := []byte(seed)
 	rng := crypto.NewCSPRNG(seed_bytes)
 
-	for i := range(len(vec)) {
+	for i := range len(vec) {
 		expected := rng.NextInt64()
 
 		if expected != vec[i] {
@@ -80,7 +74,6 @@ func (ck *BasicStateKernel) VerifyVector(seed string, vec []int64) bool {
 	}
 	return true
 }
-
 
 func (ck *BasicStateKernel) RandInt(seed string, s int64, e int64) int64 {
 	return 0
@@ -103,7 +96,6 @@ func (hk *BasicStateKernel) HashState(state []int64) string {
 	return ""
 }
 
-
-func (sk *BasicStateKernel) GetEventHash(event *model.Event) (string ,error) {
+func (sk *BasicStateKernel) GetEventHash(event *model.Event) (string, error) {
 	return "thisiseventhash", nil
 }

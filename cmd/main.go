@@ -1,26 +1,29 @@
 package cmd
 
 import (
-        "log"
+	"log"
+
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-        Use:   "ftn",
-        Short: "ftn is a client for the MX trading engine",
+	Use:   "ftn",
+	Short: "ftn is a client for the MX trading engine",
 }
 
 func Execute() {
-        if err := rootCmd.Execute(); err != nil {
-                log.Fatalf("cli execution failed: %v", err)
-        }
+	if err := rootCmd.Execute(); err != nil {
+		log.Fatalf("cli execution failed: %v", err)
+	}
 }
 
 // Execute sets up the CLI entry point
 func init() {
-        nodeCMD := CreateNodeCMD()
+	nodeCMD := CreateNodeCMD()
 	eventCMD := CreateEventCMD()
+	apiCMD := CreateAPICMD()
 
-        rootCmd.AddCommand(nodeCMD)
+	rootCmd.AddCommand(nodeCMD)
 	rootCmd.AddCommand(eventCMD)
+	rootCmd.AddCommand(apiCMD)
 }

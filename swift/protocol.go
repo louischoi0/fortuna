@@ -1,34 +1,39 @@
 package swift
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"strings"
-	"encoding/json"
-	"log"
-	"bytes"
 )
 
 type PacketType uint8
 
 const (
-	PacketTypeUnknown		PacketType = 0
-	PacketTypePing			PacketType = 1
-	PacketTypePong			PacketType = 2
-	PacketTypeErrorResponse		PacketType = 9
+	PacketTypeUnknown       PacketType = 0
+	PacketTypePing          PacketType = 1
+	PacketTypePong          PacketType = 2
+	PacketTypeErrorResponse PacketType = 9
 
+	PacketTypeEmitEventRequest  PacketType = 10
+	PacketTypeEmitEventResponse PacketType = 11
 
-	PacketTypeEmitEventRequest	PacketType = 10
-	PacketTypeEmitEventResponse	PacketType = 11
+	PacketTypeStateSeedAPIRequest  PacketType = 12
+	PacketTypeStateSeedAPIResponse PacketType = 13
 
-	PacketTypeStateSeedAPIRequest	PacketType = 12
-	PacketTypeStateSeedAPIResponse	PacketType = 13
+	PacketTypeGenVectorRequest  PacketType = 14
+	PacketTypeGenVectorResponse PacketType = 15
+
+	PacketTypeVerifyVectorRequest  PacketType = 16
+	PacketTypeVerifyVectorResponse PacketType = 17
 )
 
 type Packet struct {
-	Type    	PacketType      `json:"type"`
-	Payload 	json.RawMessage `json:"payload"`
-	Header		string		`json:"header,ommitempty"`
+	Type    PacketType      `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+	Header  string          `json:"header,ommitempty"`
 }
 
 func ParseRemoteAddr(addr string) (string, string, string, error) {
@@ -54,11 +59,11 @@ func ParseRemoteAddr(addr string) (string, string, string, error) {
 }
 
 func FormatResponse(payload *json.RawMessage) string {
-        var prettyJSON bytes.Buffer
+	var prettyJSON bytes.Buffer
 
-        if err := json.Indent(&prettyJSON, *payload, "", "    "); err != nil {
-                log.Fatalf("JSON formatting failed: %v", err)
-                return ""
-        }
-        return prettyJSON.String()
+	if err := json.Indent(&prettyJSON, *payload, "", "    "); err != nil {
+		log.Fatalf("JSON formatting failed: %v", err)
+		return ""
+	}
+	return prettyJSON.String()
 }
