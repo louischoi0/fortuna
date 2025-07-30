@@ -1,37 +1,36 @@
 package swift
 
 import (
-	"sync"
-	"fmt"
-	"log"
 	"context"
-	"net"
-	"io"
-	"time"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"sync"
+	"time"
 )
-
 
 type PacketHandler func(ctx context.Context, packet *Packet) error
 
 type TCPServer struct {
-	handlers      map[PacketType]func(ctx context.Context, packet *Packet) error
-	peers         map[string]net.Conn
-	listener      net.Listener
-	
-	host	      	string
-	port	      	int
-	address		string
+	handlers map[PacketType]func(ctx context.Context, packet *Packet) error
+	peers    map[string]net.Conn
+	listener net.Listener
 
-	mu            sync.RWMutex
+	host    string
+	port    int
+	address string
+
+	mu sync.RWMutex
 }
 
 func NewServer() *TCPServer {
 
-	return &TCPServer {
-		host:	"0.0.0.0",
-		peers:         make(map[string]net.Conn),
+	return &TCPServer{
+		host:     "0.0.0.0",
+		peers:    make(map[string]net.Conn),
 		mu:       sync.RWMutex{},
 		handlers: make(map[PacketType]func(ctx context.Context, packet *Packet) error),
 	}
@@ -40,7 +39,7 @@ func NewServer() *TCPServer {
 func (s *TCPServer) Start(port int) error {
 	var err error
 	s.address = fmt.Sprintf("%v:%v", s.host, port)
-	
+
 	s.listener, err = net.Listen("tcp", s.address)
 	log.Printf("start swift server %v", s.address)
 
@@ -162,6 +161,3 @@ func (s *TCPServer) RegisterHandler(packetType PacketType, handler PacketHandler
 	defer s.mu.Unlock()
 	s.handlers[packetType] = handler
 }
-
-
-

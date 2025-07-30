@@ -76,10 +76,9 @@ func CreateGenStateSeedAPI() *cobra.Command {
 			}
 
 			if err == nil {
-				buf := swift.FormatResponse(&response.Payload)
+				buf := swift.FormatJSONResponse(response.Payload)
 				fmt.Println(buf)
 			}
-
 		},
 	}
 

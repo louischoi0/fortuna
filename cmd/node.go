@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"fortuna/core"
-	"fortuna/swift"
 	"fortuna/rpc"
+	"fortuna/swift"
 	"log"
+
+	"github.com/spf13/cobra"
 )
 
 const CLI_DEFAULT_ENDPOINT = "localhost:4277"
@@ -13,8 +14,8 @@ const CLI_DEFAULT_ENDPOINT = "localhost:4277"
 func CreatePingRequestCMD() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ping",
-                Short: "",
-                RunE: func(cmd *cobra.Command, args []string) error {
+		Short: "",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			endpoint, _ := cmd.Flags().GetString("endpoint")
 			request := rpc.NewRawRequest(endpoint, swift.PacketTypePing, `""`)
 			response, err := request.Call()
@@ -22,7 +23,7 @@ func CreatePingRequestCMD() *cobra.Command {
 				log.Fatalf(err.Error())
 			}
 
-			buffer := swift.FormatResponse(&response.Payload)
+			buffer := swift.FormatJSONResponse(response.Payload)
 			log.Println(buffer)
 
 			return nil
@@ -37,15 +38,15 @@ func CreateNodeStartCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "run",
-                Short: "",
-                RunE: func(cmd *cobra.Command, args []string) error {
+		Short: "",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			workspace, _ := cmd.Flags().GetString("workspace")
 			port, _ := cmd.Flags().GetInt("port")
 
 			syn := core.NewSynapse(workspace)
 			syn.StartUp()
 			syn.Run(port)
-	
+
 			return nil
 		},
 	}

@@ -31,9 +31,9 @@ const (
 )
 
 type Packet struct {
-	Type    PacketType      `json:"type"`
-	Payload json.RawMessage `json:"payload"`
-	Header  string          `json:"header,ommitempty"`
+	Type    PacketType `json:"type"`
+	Payload []byte     `json:"payload"`
+	Header  string     `json:"header,omitempty"`
 }
 
 func ParseRemoteAddr(addr string) (string, string, string, error) {
@@ -58,10 +58,10 @@ func ParseRemoteAddr(addr string) (string, string, string, error) {
 	return fmt.Sprintf("%s:%s", host, port), host, port, nil
 }
 
-func FormatResponse(payload *json.RawMessage) string {
+func FormatJSONResponse(payload []byte) string {
 	var prettyJSON bytes.Buffer
 
-	if err := json.Indent(&prettyJSON, *payload, "", "    "); err != nil {
+	if err := json.Indent(&prettyJSON, payload, "", "    "); err != nil {
 		log.Fatalf("JSON formatting failed: %v", err)
 		return ""
 	}
