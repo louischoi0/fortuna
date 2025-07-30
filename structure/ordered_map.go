@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+	"fortuna/crypto"
 )
 
 type OrderedMap struct {
@@ -62,6 +63,10 @@ func (om *OrderedMap) String(key string) (string, bool) {
 		return "", false
 	} 
 	return value.(string), true
+}
+
+func (om *OrderedMap) Hash() string {
+	return crypto.SHA256(om.Ser())
 }
 
 func (om *OrderedMap) Keys() []string {

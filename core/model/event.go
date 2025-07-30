@@ -2,8 +2,12 @@ package model
 
 import (
 	"fortuna/structure"
+	"fortuna/crypto"
 	"fmt"
+	"strings"
 )
+
+const HASH_SEPERATOR = ":"
 
 type Identity struct {
 	OrganizationID		string  `json:"organization_id"`
@@ -90,6 +94,22 @@ type Event struct {
 	Subtopic	string			`json:"subtopic"`
 	Seperator	string			`json:"seperator"`
 	Tag		string			`json:"tag"`
+}
+
+func (event *Event) Hash() string {
+	var buf strings.Builder
+	
+	buf.WriteString(event.SpaceID)
+	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(event.Spec.InterfaceID)
+	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(event.Spec.KernelVersion)
+	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(event.Spec.Params.Hash())
+	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(event.Payload.Hash())
+
+	return crypto.SHA256(buf.String())
 }
 
 func NewEventRequest(spaceID string, payload *structure.OrderedMap, spec *EventSpec, topic string, subtopic string, tag string) *Event{
@@ -209,6 +229,7 @@ func (er *EventExecutionError) Map() *structure.OrderedMap {
 
 type EventExecutionResult struct {
 	Event		*Event			`json:"event"`
+	EventHash	string			`json:"event_hash"`
 	Result		string			`json:"result"`
 	Err		*EventExecutionError	`json:"error"`
 }
@@ -222,11 +243,32 @@ func (xr *EventExecutionResult) String() string {
 	return om.Ser()
 }
 
+func (xr *EventExecutionResult) Hash() string {
+	if xr.Event == nil {
+		return ""
+	}
+
+	var buffer strings.Builder
+	buffer.WriteString(xr.Event.Hash())
+	buffer.WriteString(HASH_SEPERATOR)
+	buffer.WriteString(xr.Result)
+
+	return crypto.SHA256(buffer.String())
+}
+
 func (xr *EventExecutionResult) Map() *structure.OrderedMap {
 	om := structure.NewOrderedMap()
 	
-	// om.Set("event", xr.Event.Map())
+	if xr.Event != nil {
+		om.Set("event", xr.Event.Map())
+		om.Set("event_hash", xr.Event.Hash())
+	} else {
+		om.Set("event", nil)
+		om.Set("event_hash", nil)
+	}
+
 	om.Set("result", xr.Result)
+
 	if xr.Err != nil {
 		om.Set("error", xr.Err.Map())
 	} else {

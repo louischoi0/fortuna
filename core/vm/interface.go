@@ -66,6 +66,7 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 
 	executionResult := &model.EventExecutionResult{
 		Result: result,
+		EventHash:   event.Hash(),
 		Err:    nil,
 	}
 
