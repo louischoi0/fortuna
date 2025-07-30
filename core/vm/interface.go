@@ -54,6 +54,10 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count")
 	}
 
+	if int(slotCount) >= len(machine.State) {
+		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count is bigger than legth of machine state")
+	}
+
 	indices := kernel.GenVector(seed, 2)
 	a := indices[0] % slotCount
 	b := indices[1] % slotCount
@@ -65,11 +69,9 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 		result = "f"
 	}
 
-	executionResult := &model.EventExecutionResult{
-		Result: result,
-		EventHash:   event.Hash(),
-		Err:    nil,
-	}
-
+	executionResult := model.NewEventExecutionResultFromEvent(event, result)
 	return executionResult
 }
+
+
+

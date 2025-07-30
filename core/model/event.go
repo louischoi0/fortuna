@@ -48,7 +48,43 @@ func (es *EventSpec) String() string {
 	return om.Ser()
 }
 
-func NewEventSpecFromMap(data *structure.OrderedMap) (*EventSpec, error) {
+func NewEventSpecFromMap(data map[string]interface{}) (*EventSpec, error) {
+	interface_id, ok := data.Get("interface_id")
+	if !ok {
+		return nil, fmt.Errorf("event spec must have interface_id")
+	}
+
+	interface_id, ok = interface_id.(string)
+	if !ok {
+		return nil, fmt.Errorf("interface_id must have type: integer")
+	}
+
+	version, ok := data.Get("version")
+	if !ok {
+		return nil, fmt.Errorf("event spec must have version")
+	}
+
+	params, ok := data.Get("params")
+	if !ok {
+		return nil, fmt.Errorf("event spec must have params")
+	}
+
+	params, ok = params.(*structure.OrderedMap)
+	if !ok {
+		return nil, fmt.Errorf("params must have type: ordered map")
+	}
+
+	spec := EventSpec{
+		InterfaceID: interface_id.(string),
+		KernelVersion: version.(string),
+		Params: params.(*structure.OrderedMap),
+	}
+
+	return &spec, nil
+
+}
+
+func NewEventSpecFromOrderedMap(data *structure.OrderedMap) (*EventSpec, error) {
 	interface_id, ok := data.Get("interface_id")
 	if !ok {
 		return nil, fmt.Errorf("event spec must have interface_id")
@@ -137,7 +173,7 @@ func (event *Event) Map() *structure.OrderedMap {
 	// om.Set("publisher", event.Publisher)
 	om.Set("space_id", event.SpaceID)
 	om.Set("payload", event.Payload)
-	om.Set("spec", event.Spec.String())
+	om.Set("spec", event.Spec.Map())
 	om.Set("topic", event.Topic)
 	om.Set("subtopic", event.Subtopic)
 	om.Set("seperator", event.Seperator)
@@ -200,7 +236,7 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 		return nil, fmt.Errorf("topic must have type: string")
 	}
 
-	spec, err := NewEventSpecFromMap(specData_s)
+	spec, err := NewEventSpecFromOrderedMap(specData_s)
 	if err != nil {
 		return nil, err
 	}
@@ -254,6 +290,15 @@ func (xr *EventExecutionResult) Hash() string {
 	buffer.WriteString(xr.Result)
 
 	return crypto.SHA256(buffer.String())
+}
+
+func NewEventExecutionResultFromEvent(event *Event, result string) *EventExecutionResult {
+	return &EventExecutionResult{
+		Event: event,
+		Result: result,
+		EventHash:   event.Hash(),
+		Err:    nil,
+	}
 }
 
 func (xr *EventExecutionResult) Map() *structure.OrderedMap {
