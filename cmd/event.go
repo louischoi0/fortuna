@@ -1,22 +1,22 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
-	"fortuna/structure"
-	"fortuna/swift"
-	"fortuna/core/model"
 	"fmt"
+	"fortuna/core/model"
 	"fortuna/rpc"
+	"fortuna/structure"
+
+	"github.com/spf13/cobra"
 )
 
 func CreateEventEmitCMD() *cobra.Command {
-        var interface_id 	string
-	var space_id		string
-	var kernel_version	string
-	var endpoint 		string
-	var topic		string
-	var subtopic		string
-	var tag 		string
+	var interface_id string
+	var space_id string
+	var kernel_version string
+	var endpoint string
+	var topic string
+	var subtopic string
+	var tag string
 
 	cmd := &cobra.Command{
 		Use:   "emit",
@@ -42,22 +42,21 @@ func CreateEventEmitCMD() *cobra.Command {
 			}
 
 			if err == nil {
-				buf := swift.FormatResponse(&response.Payload)
-				fmt.Println(buf)
+				fmt.Println(string(response.Payload))
 			}
 		},
-        }
+	}
 
-        cmd.Flags().StringVarP(&endpoint, "space_id", "s", "", "space id")
-        cmd.Flags().StringVarP(&interface_id, "interface_id", "i", "FIC_001", "interface id")
-        cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base-v0.0.0", "interface id")
+	cmd.Flags().StringVarP(&endpoint, "space_id", "s", "", "space id")
+	cmd.Flags().StringVarP(&interface_id, "interface_id", "i", "FIC_001", "interface id")
+	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base-v0.0.0", "interface id")
 
-        cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
-        cmd.Flags().StringVarP(&topic, "topic", "t", "", "topic")
-        cmd.Flags().StringVarP(&subtopic, "subtopic", "c", "", "subtopic")
-        cmd.Flags().StringVarP(&tag, "tag", "g", "", "tag")
+	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
+	cmd.Flags().StringVarP(&topic, "topic", "t", "", "topic")
+	cmd.Flags().StringVarP(&subtopic, "subtopic", "c", "", "subtopic")
+	cmd.Flags().StringVarP(&tag, "tag", "g", "", "tag")
 
-        return cmd
+	return cmd
 }
 
 func CreateEventCMD() *cobra.Command {
