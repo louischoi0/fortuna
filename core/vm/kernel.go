@@ -3,7 +3,6 @@ package vm
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fortuna/core/model"
 	"fortuna/crypto"
 	"time"
 )
@@ -18,12 +17,11 @@ type StateKernel interface {
 	GenVector(seed string, size int64) []int64
 	VerifyVector(seed string, vector []int64) bool
 	RandInt(seed string, minValue int64, maxValue int64) int64
+	GenIndex(seed string, minValue int64, maxValue int64, size int64) []int64
 
 	GenStateSeed() (string, string)
 	GenStateSeedPayload(payload string) string
 	VerifySeed(seed string, payload string) bool
-
-	GetEventHash(event *model.Event) (string, error)
 
 	Hash(data string) (string, error)
 	// HashState(state []int64) string
@@ -75,8 +73,25 @@ func (ck *BasicStateKernel) VerifyVector(seed string, vec []int64) bool {
 	return true
 }
 
+func (ck *BasicStateKernel) GenIndex(seed string, s int64, e int64, size int64) []int64 {
+	res := make([]int64, size)
+
+	seed_bytes := []byte(seed)
+	rng := crypto.NewCSPRNG(seed_bytes)
+
+	for i := range size {
+		v := rng.NextInt64()
+		res[i] = int64((uint64(v) % uint64(e)) + uint64(s))
+	}
+	return res
+}
+
 func (ck *BasicStateKernel) RandInt(seed string, s int64, e int64) int64 {
-	return 0
+	seed_bytes := []byte(seed)
+	rng := crypto.NewCSPRNG(seed_bytes)
+	v := rng.NextInt64()
+
+	return (v % e) + s
 }
 
 func (ck *BasicStateKernel) VerifySeed(seed string, payload string) bool {
@@ -96,6 +111,3 @@ func (hk *BasicStateKernel) HashState(state []int64) string {
 	return ""
 }
 
-func (sk *BasicStateKernel) GetEventHash(event *model.Event) (string, error) {
-	return "thisiseventhash", nil
-}

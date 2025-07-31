@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fortuna/core"
+	"fortuna/core/component"
 	"fortuna/rpc"
 	"fortuna/swift"
 	"log"
@@ -43,7 +43,7 @@ func CreateNodeStartCmd() *cobra.Command {
 			workspace, _ := cmd.Flags().GetString("workspace")
 			port, _ := cmd.Flags().GetInt("port")
 
-			syn := core.NewSynapse(workspace)
+			syn := component.NewSynapse(workspace)
 			syn.StartUp()
 			syn.Run(port)
 

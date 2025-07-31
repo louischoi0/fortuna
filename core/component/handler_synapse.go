@@ -1,4 +1,4 @@
-package core
+package component
 
 import (
 	"context"
@@ -98,6 +98,10 @@ func (syn *Synapse) StartUp() error {
 		}
 
 		event, err := model.NewEventFromOrderedMap(omap)
+		if err != nil {
+			return syn.swift.SendErrorResponse(ctx, err.Error())
+		}
+
 		log.Printf("emit event requested. spec.KerenelVersion='%v' spec.InterfaceID='%v'", event.Spec.KernelVersion, event.Spec.InterfaceID)
 
 		if err != nil {

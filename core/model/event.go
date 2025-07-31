@@ -48,42 +48,6 @@ func (es *EventSpec) String() string {
 	return om.Ser()
 }
 
-func NewEventSpecFromMap(data map[string]interface{}) (*EventSpec, error) {
-	interface_id, ok := data.Get("interface_id")
-	if !ok {
-		return nil, fmt.Errorf("event spec must have interface_id")
-	}
-
-	interface_id, ok = interface_id.(string)
-	if !ok {
-		return nil, fmt.Errorf("interface_id must have type: integer")
-	}
-
-	version, ok := data.Get("version")
-	if !ok {
-		return nil, fmt.Errorf("event spec must have version")
-	}
-
-	params, ok := data.Get("params")
-	if !ok {
-		return nil, fmt.Errorf("event spec must have params")
-	}
-
-	params, ok = params.(*structure.OrderedMap)
-	if !ok {
-		return nil, fmt.Errorf("params must have type: ordered map")
-	}
-
-	spec := EventSpec{
-		InterfaceID: interface_id.(string),
-		KernelVersion: version.(string),
-		Params: params.(*structure.OrderedMap),
-	}
-
-	return &spec, nil
-
-}
-
 func NewEventSpecFromOrderedMap(data *structure.OrderedMap) (*EventSpec, error) {
 	interface_id, ok := data.Get("interface_id")
 	if !ok {
@@ -124,12 +88,16 @@ type Event struct {
 	SpaceID		string			`json:"space_id"`
 
 	Payload		*structure.OrderedMap	`json:"payload"`
-	Spec		EventSpec		`json:"spec"`
+	Spec		*EventSpec		`json:"spec"`
 
 	Topic		string			`json:"topic"`	
 	Subtopic	string			`json:"subtopic"`
 	Seperator	string			`json:"seperator"`
 	Tag		string			`json:"tag"`
+}
+
+func (event *Event) Verify(eventHash string) bool {
+	return event.Hash() == eventHash
 }
 
 func (event *Event) Hash() string {
@@ -152,7 +120,7 @@ func NewEventRequest(spaceID string, payload *structure.OrderedMap, spec *EventS
 	return &Event{
 			SpaceID: spaceID,
 			Payload: payload,
-			Spec: *spec,
+			Spec: spec,
 			Topic: topic,
 			Subtopic: subtopic,
 			Tag: tag,
@@ -215,15 +183,15 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 		return nil, fmt.Errorf("event data must have key:spec")
 	}
 
-	_, ok = specData.(string)
+	_, ok = specData.(*structure.OrderedMap)
+
 	if !ok {
-		return nil, fmt.Errorf("spec data must be string")
+		return nil, fmt.Errorf("event spec data must have ordered map")
 	}
 
-	specData_s, err := structure.ParseOrderedMap(specData.(string))
-
+	spec, err := NewEventSpecFromOrderedMap(specData.(*structure.OrderedMap))
 	if err != nil {
-		return nil, fmt.Errorf("spec data type conversion failed %v", err.Error())
+		return nil, fmt.Errorf("event spec data must have ordered map")
 	}
 
 	topic, ok := data.Get("topic")
@@ -236,14 +204,9 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 		return nil, fmt.Errorf("topic must have type: string")
 	}
 
-	spec, err := NewEventSpecFromOrderedMap(specData_s)
-	if err != nil {
-		return nil, err
-	}
-
 	event := Event{
 		SpaceID: spaceID_s,
-		Spec: *spec,
+		Spec: spec,
 		Payload: payload_s,
 		Topic: topic_s,
 	}
@@ -299,6 +262,10 @@ func NewEventExecutionResultFromEvent(event *Event, result string) *EventExecuti
 		EventHash:   event.Hash(),
 		Err:    nil,
 	}
+}
+
+func (xr *EventExecutionResult) Verify(hash string) bool {
+	return xr.Hash() == hash
 }
 
 func (xr *EventExecutionResult) Map() *structure.OrderedMap {

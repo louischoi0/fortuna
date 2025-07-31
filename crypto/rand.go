@@ -28,8 +28,9 @@ func (c *CSPRNG) NextInt64() int64 {
 	binary.BigEndian.PutUint64(counterBytes, c.counter)
 	mac := hmac.New(sha256.New, c.seed)
 	mac.Write(counterBytes)
-	digest := mac.Sum(nil)
+	c.counter++
 
+	digest := mac.Sum(nil)
 	randomInt := int64(binary.BigEndian.Uint64(digest[:8]))
 	return randomInt
 }

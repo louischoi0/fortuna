@@ -47,20 +47,22 @@ func EXEC_INTERFACE(machine *StateMachine, event *model.Event, kernel StateKerne
 }
 
 func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventExecutionResult {
-	seed, _ := kernel.GetEventHash(event)
-	slotCount, ok := event.Spec.Params.Int64("slot_count")
+	seed := event.Hash()
+	slot_count, ok := event.Spec.Params.Int64("slot_count")
 
 	if !ok {
 		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count")
 	}
 
-	if int(slotCount) >= len(machine.State) {
+	if int(slot_count) >= len(machine.State) {
 		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count is bigger than legth of machine state")
 	}
 
-	indices := kernel.GenVector(seed, 2)
-	a := indices[0] % slotCount
-	b := indices[1] % slotCount
+	indices := kernel.GenIndex(seed, 0, slot_count, 2)
+	a := indices[0] % slot_count 
+	b := indices[1] % slot_count
+	
+	fmt.Printf("seed=%v, a=%v, b=%v, sa=%v, ba=%v", seed, a, b, machine.State[a], machine.State[b])
 
 	var result string
 	if machine.State[a] > machine.State[b] {

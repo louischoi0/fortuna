@@ -2,12 +2,52 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"fortuna/core/model"
 	"fortuna/rpc"
 	"fortuna/structure"
 
 	"github.com/spf13/cobra"
 )
+
+func CreateEventVerifyCMD() *cobra.Command {
+	var event_payload 	string
+	var event_hash 		string
+
+	cmd := &cobra.Command{
+		Use:   "verify",
+		Short: "verify event",
+		Args:  cobra.NoArgs,
+
+		Run: func(cmd *cobra.Command, args []string) {
+			omap, err := structure.ParseOrderedMap(string(event_payload))
+			
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+
+			event, err := model.NewEventFromOrderedMap(omap)
+
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+			res := event.Verify(event_hash)
+			if res {
+				fmt.Println("event hash matched and verified")
+			} else {
+				fmt.Println("invalid hash")
+			}
+		},
+	}
+
+	cmd.Flags().StringVarP(&event_payload, "event_payload", "l", "", "payload")
+	cmd.Flags().StringVarP(&event_hash, "event_hash", "a", "", "interface id")
+
+	cmd.MarkFlagRequired("event_payload")
+	cmd.MarkFlagRequired("event_hash")
+
+	return cmd
+}
 
 func CreateEventEmitCMD() *cobra.Command {
 	var interface_id string
@@ -25,10 +65,11 @@ func CreateEventEmitCMD() *cobra.Command {
 
 		Run: func(cmd *cobra.Command, args []string) {
 			params := structure.NewOrderedMap()
-			params.Set("slot_count", 2)
+			params.Set("slot_count", 64)
 
 			auth := ""
 			payload := structure.NewOrderedMap()
+			payload.Set("a", 3)
 
 			spec := model.NewEventSpec(interface_id, kernel_version, params)
 			event := model.NewEventRequest(space_id, payload, spec, topic, subtopic, tag)
@@ -47,7 +88,7 @@ func CreateEventEmitCMD() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&endpoint, "space_id", "s", "", "space id")
+	cmd.Flags().StringVarP(&space_id, "space_id", "s", "", "space id")
 	cmd.Flags().StringVarP(&interface_id, "interface_id", "i", "FIC_001", "interface id")
 	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base-v0.0.0", "interface id")
 
@@ -66,6 +107,7 @@ func CreateEventCMD() *cobra.Command {
 	}
 
 	cmd.AddCommand(CreateEventEmitCMD())
+	cmd.AddCommand(CreateEventVerifyCMD())
 
 	return cmd
 }
