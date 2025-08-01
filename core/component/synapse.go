@@ -22,7 +22,7 @@ type Synapse struct {
 	machines 	map[vm.KernelVersion]*vm.StateMachine
 
 	confirms 	[]*model.EventExecutionResult
-	swift *swift.TCPServer
+	swift 		*swift.TCPServer
 }
 
 func NewSynapse(spaceID string) *Synapse {

@@ -96,6 +96,23 @@ type Event struct {
 	Tag		string			`json:"tag"`
 }
 
+const MODEL_HASH_LENGTH = 64
+
+func (event *Event) Encode() []byte {
+	var buf bytes
+
+	hash := event.Hash()
+
+	payload_length := uint32(len(event.Payload))
+	//bin := 
+
+	return []byte(buf.String())
+}
+
+func DecodeEvent(body []byte) *Event {
+	return nil
+}
+
 func (event *Event) Verify(eventHash string) bool {
 	return event.Hash() == eventHash
 }
