@@ -3,11 +3,11 @@ package structure
 import (
 	"errors"
 	"fmt"
+	"fortuna/crypto"
 	"strconv"
 	"strings"
 	"sync"
 	"unicode"
-	"fortuna/crypto"
 )
 
 type OrderedMap struct {
@@ -45,7 +45,7 @@ func (om *OrderedMap) Int64(key string) (int64, bool) {
 	value, ok := om.Get(key)
 	if !ok {
 		return 0, false
-	} 
+	}
 	return value.(int64), true
 }
 
@@ -53,7 +53,7 @@ func (om *OrderedMap) Int(key string) (int, bool) {
 	value, ok := om.Get(key)
 	if !ok {
 		return 0, false
-	} 
+	}
 	return value.(int), true
 }
 
@@ -61,7 +61,7 @@ func (om *OrderedMap) String(key string) (string, bool) {
 	value, ok := om.Get(key)
 	if !ok {
 		return "", false
-	} 
+	}
 	return value.(string), true
 }
 
@@ -352,13 +352,13 @@ func parseArray(i *int, jsonStr string) (interface{}, error) {
 	if jsonStr[*i] != '[' {
 		return nil, errors.New("expected '[' at the beginning of array")
 	}
-	*i++ 
+	*i++
 	var array []interface{}
 
 	for *i < len(jsonStr) {
 		skipWhitespace(i, jsonStr)
 		if jsonStr[*i] == ']' {
-			*i++ 
+			*i++
 			return array, nil
 		}
 
@@ -370,11 +370,10 @@ func parseArray(i *int, jsonStr string) (interface{}, error) {
 
 		skipWhitespace(i, jsonStr)
 		if jsonStr[*i] == ',' {
-			*i++ 
+			*i++
 		} else if jsonStr[*i] != ']' {
 			return nil, errors.New("expected ',' or ']' in array")
 		}
 	}
 	return nil, errors.New("unexpected end of JSON while parsing array")
 }
-

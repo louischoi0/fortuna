@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fortuna/core/model"
-	"fortuna/core/util"
 	"fortuna/core/vm"
 	"fortuna/structure"
 	"fortuna/swift"
+	"fortuna/util"
 	"log"
 )
 

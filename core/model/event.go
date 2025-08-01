@@ -1,31 +1,40 @@
 package model
 
 import (
-	"fortuna/structure"
-	"fortuna/crypto"
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"fortuna/crypto"
+	"fortuna/structure"
+	"fortuna/util"
 	"strings"
 )
 
 const HASH_SEPERATOR = ":"
+const IDENTITY_ADDRESS_STR_LENGTH = 64
+const MODEL_HASH_STR_LENGTH = 64
+const SPACE_ID_STR_LENGTH = 64
+const INTERFACE_ID_STR_LENGTH = 12
+const KERNEL_VERSION_STR_LENGTH = 12
 
 type Identity struct {
-	OrganizationID		string  `json:"organization_id"`
-	WorkspaceID		string	`json:"workspace_id"`
-	UserID			string	`json:"user_id"`
+	Address        string `json:"address"`
+	OrganizationID string `json:"organization_id"`
+	WorkspaceID    string `json:"workspace_id"`
+	UserID         string `json:"user_id"`
 }
 
 type EventSpec struct {
-	InterfaceID	string			`json:"interface_id"`
-	KernelVersion	string 			`json:"kernel_version"`
-	Params		*structure.OrderedMap	`json:"params"`
+	InterfaceID   string                `json:"interface_id"`
+	KernelVersion string                `json:"kernel_version"`
+	Params        *structure.OrderedMap `json:"params"`
 }
 
 func NewEventSpec(interface_id string, kernel_version string, params *structure.OrderedMap) *EventSpec {
 	return &EventSpec{
-		InterfaceID: interface_id,
+		InterfaceID:   interface_id,
 		KernelVersion: kernel_version,
-		Params: params,
+		Params:        params,
 	}
 }
 
@@ -39,7 +48,7 @@ func (es *EventSpec) Map() *structure.OrderedMap {
 	om.Set("interface_id", es.InterfaceID)
 	om.Set("version", es.KernelVersion)
 	om.Set("params", es.Params)
-	
+
 	return om
 }
 
@@ -75,42 +84,200 @@ func NewEventSpecFromOrderedMap(data *structure.OrderedMap) (*EventSpec, error) 
 	}
 
 	spec := EventSpec{
-		InterfaceID: interface_id.(string),
+		InterfaceID:   interface_id.(string),
 		KernelVersion: version.(string),
-		Params: params.(*structure.OrderedMap),
+		Params:        params.(*structure.OrderedMap),
 	}
 
 	return &spec, nil
 }
 
 type Event struct {
-	// Publisher 	Identity		`json:"publisher"`
-	SpaceID		string			`json:"space_id"`
+	Publisher string `json:"publisher"`
+	SpaceID   string `json:"space_id"`
 
-	Payload		*structure.OrderedMap	`json:"payload"`
-	Spec		*EventSpec		`json:"spec"`
+	Payload *structure.OrderedMap `json:"payload"`
+	Spec    *EventSpec            `json:"spec"`
 
-	Topic		string			`json:"topic"`	
-	Subtopic	string			`json:"subtopic"`
-	Seperator	string			`json:"seperator"`
-	Tag		string			`json:"tag"`
+	Topic     string `json:"topic"`
+	Subtopic  string `json:"subtopic"`
+	Seperator string `json:"seperator"`
+	Tag       string `json:"tag"`
 }
 
-const MODEL_HASH_LENGTH = 64
+// DecodeEvent decodes bytes produced by (*Event).Encode() back into an Event.
+// It also verifies the leading hash matches event.Hash() after reconstruction.
+func DecodeEvent(b []byte) (*Event, error) {
+	var (
+		off = 0
+		n   = len(b)
+	)
 
-func (event *Event) Encode() []byte {
-	var buf bytes
+	need := func(k int) error {
+		if off+k > n {
+			return fmt.Errorf("buffer underflow: %d", k)
+		}
+		return nil
+	}
+	readFixedString := func(k int) (string, error) {
+		if err := need(k); err != nil {
+			return "", err
+		}
+		s := string(b[off : off+k])
+		off += k
+		return s, nil
+	}
+	readU64LE := func() (uint64, error) {
+		if err := need(8); err != nil {
+			return 0, err
+		}
+		u := binary.LittleEndian.Uint64(b[off : off+8])
+		off += 8
+		return u, nil
+	}
+
+	hash, err := readFixedString(MODEL_HASH_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read hash: %w", err)
+	}
+	spaceID, err := readFixedString(SPACE_ID_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read spaceID: %w", err)
+	}
+	ifaceID, err := readFixedString(INTERFACE_ID_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read interfaceID: %w", err)
+	}
+	kernelVer, err := readFixedString(KERNEL_VERSION_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read kernelVersion: %w", err)
+	}
+
+	if err := need(1); err != nil {
+		return nil, fmt.Errorf("read params flag: %w", err)
+	}
+	paramsStart := off
+	off++
+
+	totalLenParams, err := readU64LE()
+	if err != nil {
+		return nil, fmt.Errorf("read params totalLen: %w", err)
+	}
+	if err := need(int(totalLenParams)); err != nil {
+		return nil, fmt.Errorf("params body underflow: %w", err)
+	}
+	paramsBlob := b[paramsStart : paramsStart+1+8+int(totalLenParams)]
+	off += int(totalLenParams)
+
+	params, err := util.DecodeOrderedMap(paramsBlob)
+	if err != nil {
+		return nil, fmt.Errorf("DecodeOrderedMap(params): %w", err)
+	}
+
+	if err := need(1); err != nil {
+		return nil, fmt.Errorf("read payload flag: %w", err)
+	}
+	payloadStart := off
+	off++
+
+	totalLenPayload, err := readU64LE()
+	if err != nil {
+		return nil, fmt.Errorf("read payload totalLen: %w", err)
+	}
+	if err := need(int(totalLenPayload)); err != nil {
+		return nil, fmt.Errorf("payload body underflow: %w", err)
+	}
+	payloadBlob := b[payloadStart : payloadStart+1+8+int(totalLenPayload)]
+	off += int(totalLenPayload)
+
+	payload, err := util.DecodeOrderedMap(payloadBlob)
+	if err != nil {
+		return nil, fmt.Errorf("DecodeOrderedMap(payload): %w", err)
+	}
+
+	topicRaw, err := readFixedString(16)
+	if err != nil {
+		return nil, fmt.Errorf("read topic: %w", err)
+	}
+	subtopicRaw, err := readFixedString(16)
+	if err != nil {
+		return nil, fmt.Errorf("read subtopic: %w", err)
+	}
+	sepRaw, err := readFixedString(16)
+	if err != nil {
+		return nil, fmt.Errorf("read seperator: %w", err)
+	}
+	tagRaw, err := readFixedString(16)
+	if err != nil {
+		return nil, fmt.Errorf("read tag: %w", err)
+	}
+
+	evt := &Event{
+		SpaceID: spaceID,
+		Spec: &EventSpec{
+			InterfaceID:   ifaceID,
+			KernelVersion: kernelVer,
+			Params:        params,
+		},
+		Payload:   payload,
+		Topic:     util.UnpadLeftS(topicRaw),
+		Subtopic:  util.UnpadLeftS(subtopicRaw),
+		Seperator: util.UnpadLeftS(sepRaw),
+		Tag:       util.UnpadLeftS(tagRaw),
+	}
+
+	if got := evt.Hash(); got != hash {
+		return nil, fmt.Errorf("hash mismatch: header=%q computed=%q", hash, got)
+	}
+
+	return evt, nil
+}
+
+func (event *Event) Encode() ([]byte, error) {
+	var buf bytes.Buffer
 
 	hash := event.Hash()
+	if len(hash) != MODEL_HASH_STR_LENGTH {
+		return nil, fmt.Errorf("hash must have length: %d", MODEL_HASH_STR_LENGTH)
+	}
 
-	payload_length := uint32(len(event.Payload))
-	//bin := 
+	if len(event.SpaceID) != SPACE_ID_STR_LENGTH {
+		return nil, fmt.Errorf("spaceID must have length: %d", SPACE_ID_STR_LENGTH)
+	}
 
-	return []byte(buf.String())
-}
+	if len(event.Spec.InterfaceID) != INTERFACE_ID_STR_LENGTH {
+		return nil, fmt.Errorf("interfaceID must have length: %d", INTERFACE_ID_STR_LENGTH)
+	}
 
-func DecodeEvent(body []byte) *Event {
-	return nil
+	if len(event.Spec.KernelVersion) != KERNEL_VERSION_STR_LENGTH {
+		return nil, fmt.Errorf("kernelVersion must have length: %d", KERNEL_VERSION_STR_LENGTH)
+	}
+
+	buf.WriteString(hash)
+	buf.WriteString(event.SpaceID)
+	buf.WriteString(event.Spec.InterfaceID)
+	buf.WriteString(event.Spec.KernelVersion)
+
+	parambuf, err := util.EncodeOrderedMap(event.Spec.Params)
+	if err != nil {
+		return nil, err
+	}
+
+	buf.Write(parambuf)
+
+	payloadbuf, err := util.EncodeOrderedMap(event.Payload)
+	if err != nil {
+		return nil, err
+	}
+
+	buf.Write(payloadbuf)
+
+	buf.WriteString(util.PadLeftS(event.Topic, 16))
+	buf.WriteString(util.PadLeftS(event.Subtopic, 16))
+	buf.WriteString(util.PadLeftS(event.Seperator, 16))
+	buf.WriteString(util.PadLeftS(event.Tag, 16))
+
+	return buf.Bytes(), nil
 }
 
 func (event *Event) Verify(eventHash string) bool {
@@ -119,13 +286,14 @@ func (event *Event) Verify(eventHash string) bool {
 
 func (event *Event) Hash() string {
 	var buf strings.Builder
-	
+
 	buf.WriteString(event.SpaceID)
 	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(event.Spec.InterfaceID)
 	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(event.Spec.KernelVersion)
 	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(event.Publisher)
 	buf.WriteString(event.Spec.Params.Hash())
 	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(event.Payload.Hash())
@@ -133,14 +301,14 @@ func (event *Event) Hash() string {
 	return crypto.SHA256(buf.String())
 }
 
-func NewEventRequest(spaceID string, payload *structure.OrderedMap, spec *EventSpec, topic string, subtopic string, tag string) *Event{
+func NewEventRequest(spaceID string, payload *structure.OrderedMap, spec *EventSpec, topic string, subtopic string, tag string) *Event {
 	return &Event{
-			SpaceID: spaceID,
-			Payload: payload,
-			Spec: spec,
-			Topic: topic,
-			Subtopic: subtopic,
-			Tag: tag,
+		SpaceID:  spaceID,
+		Payload:  payload,
+		Spec:     spec,
+		Topic:    topic,
+		Subtopic: subtopic,
+		Tag:      tag,
 	}
 }
 
@@ -155,7 +323,7 @@ func (event *Event) String() string {
 func (event *Event) Map() *structure.OrderedMap {
 	om := structure.NewOrderedMap()
 
-	// om.Set("publisher", event.Publisher)
+	om.Set("publisher", event.Publisher)
 	om.Set("space_id", event.SpaceID)
 	om.Set("payload", event.Payload)
 	om.Set("spec", event.Spec.Map())
@@ -223,17 +391,17 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 
 	event := Event{
 		SpaceID: spaceID_s,
-		Spec: spec,
+		Spec:    spec,
 		Payload: payload_s,
-		Topic: topic_s,
+		Topic:   topic_s,
 	}
 
 	return &event, nil
 }
 
 type EventExecutionError struct {
-	Code		int	`json:"code"`
-	Message 	string	`json:"message"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 func (er *EventExecutionError) Map() *structure.OrderedMap {
@@ -244,10 +412,10 @@ func (er *EventExecutionError) Map() *structure.OrderedMap {
 }
 
 type EventExecutionResult struct {
-	Event		*Event			`json:"event"`
-	EventHash	string			`json:"event_hash"`
-	Result		string			`json:"result"`
-	Err		*EventExecutionError	`json:"error"`
+	Event     *Event               `json:"event"`
+	EventHash string               `json:"event_hash"`
+	Result    string               `json:"result"`
+	Err       *EventExecutionError `json:"error"`
 }
 
 func (xr *EventExecutionResult) Buffer() []byte {
@@ -274,10 +442,10 @@ func (xr *EventExecutionResult) Hash() string {
 
 func NewEventExecutionResultFromEvent(event *Event, result string) *EventExecutionResult {
 	return &EventExecutionResult{
-		Event: event,
-		Result: result,
-		EventHash:   event.Hash(),
-		Err:    nil,
+		Event:     event,
+		Result:    result,
+		EventHash: event.Hash(),
+		Err:       nil,
 	}
 }
 
@@ -287,7 +455,7 @@ func (xr *EventExecutionResult) Verify(hash string) bool {
 
 func (xr *EventExecutionResult) Map() *structure.OrderedMap {
 	om := structure.NewOrderedMap()
-	
+
 	if xr.Event != nil {
 		om.Set("event", xr.Event.Map())
 		om.Set("event_hash", xr.Event.Hash())

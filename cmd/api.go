@@ -3,10 +3,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"fortuna/core/util"
 	"fortuna/rpc"
 	"fortuna/structure"
 	"fortuna/swift"
+	"fortuna/util"
 
 	"github.com/spf13/cobra"
 )

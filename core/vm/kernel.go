@@ -10,7 +10,7 @@ import (
 type KernelVersion string
 
 const (
-	BaseV000 KernelVersion = "base-v0.0.0"
+	BaseV000 KernelVersion = "base:v.0.0"
 )
 
 type StateKernel interface {
@@ -110,4 +110,3 @@ func (hk *BasicStateKernel) Hash(input string) (string, error) {
 func (hk *BasicStateKernel) HashState(state []int64) string {
 	return ""
 }
-

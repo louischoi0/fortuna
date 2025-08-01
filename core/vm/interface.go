@@ -15,7 +15,7 @@ const (
 type InterfaceID string
 
 const (
-	FIC__001 InterfaceID = "FIC_001"
+	FIC__001 InterfaceID = "FIC-00-001"
 )
 
 func NewErrorEventExecutionResultRequiredParameter(event *model.Event, keyName string) *model.EventExecutionResult {
@@ -59,9 +59,9 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 	}
 
 	indices := kernel.GenIndex(seed, 0, slot_count, 2)
-	a := indices[0] % slot_count 
+	a := indices[0] % slot_count
 	b := indices[1] % slot_count
-	
+
 	fmt.Printf("seed=%v, a=%v, b=%v, sa=%v, ba=%v", seed, a, b, machine.State[a], machine.State[b])
 
 	var result string
@@ -74,6 +74,3 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 	executionResult := model.NewEventExecutionResultFromEvent(event, result)
 	return executionResult
 }
-
-
-
