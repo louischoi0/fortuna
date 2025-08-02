@@ -20,8 +20,6 @@ type StateKernel interface {
 	GenStateSeed() (string, string)
 	GenStateSeedPayload(payload string) string
 	VerifySeed(seed string, payload string) bool
-
-	HashState(state []int64) string
 }
 
 func LoadKernel(version KernelVersion) StateKernel {
@@ -93,8 +91,4 @@ func (ck *BasicStateKernel) RandInt(seed string, s int64, e int64) int64 {
 
 func (ck *BasicStateKernel) VerifySeed(seed string, payload string) bool {
 	return true
-}
-
-func (hk *BasicStateKernel) HashState(state []int64) string {
-	return ""
 }

@@ -1,44 +1,48 @@
 package component
 
 import (
-	"fortuna/swift"
-	"fortuna/core/vm"
-	"fortuna/core/model"
 	"fmt"
+	"fortuna/core/model"
+	"fortuna/core/vm"
+	"fortuna/swift"
 	"log"
 	"os"
-        "os/signal"
-        "syscall"
+	"os/signal"
+	"syscall"
 )
 
 const BASIC_NODE_STATE_COUNT = 256
 
 type Synapse struct {
-	ID		string
-	SpaceID		string
-	Epoch		int64
-	EpochHash	string	
+	ID        string
+	SpaceID   string
+	Epoch     int64
+	EpochHash string
 
-	machines 	map[vm.KernelVersion]*vm.StateMachine
+	machines map[vm.KernelVersion]*vm.StateMachine
+	Universe *vm.Universe
 
-	confirms 	[]*model.EventExecutionResult
-	swift 		*swift.TCPServer
+	confirms []*model.EventExecutionResult
+	swift    *swift.TCPServer
 }
 
 func NewSynapse(spaceID string) *Synapse {
-	
+	universe := vm.NewUniverse(spaceID)
+
 	return &Synapse{
-		SpaceID: spaceID,
-		Epoch: 0,
+		SpaceID:  spaceID,
+		Universe: universe,
+		Epoch:    0,
 		machines: make(map[vm.KernelVersion]*vm.StateMachine),
 		confirms: make([]*model.EventExecutionResult, 0, 100),
-		swift: swift.NewServer(),
+		swift:    swift.NewServer(),
 	}
 }
 
 func (n *Synapse) InitMachines() error {
-	machine := vm.NewBasicStateMachine(n.SpaceID, 256)
+	machine := vm.NewBasicStateMachine(n.Universe, n.SpaceID, 256)
 	machine.ResetState()
+
 	n.machines[vm.BaseV000] = machine
 
 	return nil
@@ -46,7 +50,7 @@ func (n *Synapse) InitMachines() error {
 
 func (n *Synapse) LoadMachine(kernel vm.KernelVersion) (*vm.StateMachine, error) {
 	machine, ok := n.machines[kernel]
-	
+
 	if !ok {
 		return nil, fmt.Errorf("no machine found for %v", kernel)
 	}
@@ -95,10 +99,9 @@ func (n *Synapse) Run(port int) error {
 		log.Fatalf("Failed to start server: %v", err.Error())
 	}
 
-        sigChan := make(chan os.Signal, 1)
-        signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-        <-sigChan
+	<-sigChan
 	return nil
 }
-

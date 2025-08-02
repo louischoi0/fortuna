@@ -1,26 +1,29 @@
 package vm
 
 import (
-	"time"
 	"fortuna/core/model"
+	"time"
 )
 
 type ResetStateSignal struct {
-	SpaceID   	string
-	State     	[]int64
-	StateHash 	string
-	StateSeed 	int64
+	SpaceID   string
+	State     []int64
+	StateHash string
+	StateSeed string
 }
 
 type StateMachine struct {
-	SpaceID string
+	SpaceID    string
+	Universe   *Universe
+	LastHeight int64
 
 	State      []int64
+	StateSeed  string
 	StateHash  string
 	StateCount int64
 
-	StateKernel 	StateKernel
-	KernelVersion  	KernelVersion
+	StateKernel   StateKernel
+	KernelVersion KernelVersion
 
 	lastStateGeneratedAt time.Time
 	machineCreatedAt     time.Time
@@ -28,12 +31,13 @@ type StateMachine struct {
 	reset_state_signal chan *ResetStateSignal
 }
 
-func NewBasicStateMachine(SpaceID string, stateCount int64) *StateMachine {
+func NewBasicStateMachine(universe *Universe, SpaceID string, stateCount int64) *StateMachine {
 	machine := &StateMachine{
-		SpaceID:            SpaceID,
-		StateCount:         stateCount,
-		State:              make([]int64, stateCount, stateCount),
-		StateKernel:        &BasicStateKernel{},
+		Universe:    universe,
+		SpaceID:     SpaceID,
+		StateCount:  stateCount,
+		State:       make([]int64, stateCount, stateCount),
+		StateKernel: &BasicStateKernel{},
 	}
 	return machine
 }
@@ -48,19 +52,19 @@ func (machine *StateMachine) ExecuteEvent(state []int64, tx interface{}) (interf
 }
 
 func (machine *StateMachine) GenState(size int64) ([]int64, string) {
-	stateSeed, _ := machine.StateKernel.GenStateSeed()
-	return machine.StateKernel.GenVector(stateSeed, size), stateSeed
+	machine.StateSeed, _ = machine.StateKernel.GenStateSeed()
+	machine.State = machine.StateKernel.GenVector(machine.StateSeed, size)
+	return machine.State, machine.StateSeed
 }
 
 func (machine *StateMachine) ResetState() (string, string) {
 	state, seed := machine.GenState(machine.StateCount)
 	machine.State = state
 
-	//TODO
 	hash := ""
 	return seed, hash
 }
 
-func (machine *StateMachine) VerifyMachineState() error {
-	return nil
+func (machine *StateMachine) VerifyMachineState() bool {
+	return machine.StateKernel.VerifyVector(machine.StateSeed, machine.State)
 }
