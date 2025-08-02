@@ -1,8 +1,6 @@
 package vm
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fortuna/crypto"
 	"time"
 )
@@ -23,8 +21,7 @@ type StateKernel interface {
 	GenStateSeedPayload(payload string) string
 	VerifySeed(seed string, payload string) bool
 
-	Hash(data string) (string, error)
-	// HashState(state []int64) string
+	HashState(state []int64) string
 }
 
 func LoadKernel(version KernelVersion) StateKernel {
@@ -96,15 +93,6 @@ func (ck *BasicStateKernel) RandInt(seed string, s int64, e int64) int64 {
 
 func (ck *BasicStateKernel) VerifySeed(seed string, payload string) bool {
 	return true
-}
-
-func (hk *BasicStateKernel) Hash(input string) (string, error) {
-	hash := sha256.New()
-	hash.Write([]byte(input))
-
-	hashedBytes := hash.Sum(nil)
-
-	return hex.EncodeToString(hashedBytes), nil
 }
 
 func (hk *BasicStateKernel) HashState(state []int64) string {

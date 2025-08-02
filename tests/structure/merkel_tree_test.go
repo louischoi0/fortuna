@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	. "fortuna/structure"
 	"math/big"
 	"testing"
@@ -10,9 +11,9 @@ import (
 
 type testContent string
 
-func (t testContent) CalculateHash() ([]byte, error) {
+func (t testContent) Hash() string {
 	sum := sha256.Sum256([]byte(t))
-	return sum[:], nil
+	return hex.EncodeToString(sum[:])
 }
 func (t testContent) Equals(other Content) (bool, error) {
 	o, ok := other.(testContent)
@@ -152,7 +153,7 @@ func TestGetMerklePath_Unsorted(t *testing.T) {
 	}
 
 	target := testContent("c")
-	leafHash, _ := target.CalculateHash()
+	leafHash := target.Hash()
 
 	path, indexes, err := mt.GetMerklePath(target)
 	if err != nil {
@@ -161,7 +162,7 @@ func TestGetMerklePath_Unsorted(t *testing.T) {
 	if len(path) == 0 {
 		t.Fatalf("empty merkle path")
 	}
-	root := computeRootFromPath(leafHash, path, indexes, false)
+	root := computeRootFromPath([]byte(leafHash), path, indexes, false)
 	if !bytes.Equal(root, mt.MerkleRoot()) {
 		t.Fatalf("reconstructed root mismatch (unsorted)")
 	}
@@ -181,7 +182,7 @@ func TestGetMerklePath_Sorted(t *testing.T) {
 	}
 
 	target := testContent("k3")
-	leafHash, _ := target.CalculateHash()
+	leafHash := target.Hash()
 
 	path, indexes, err := mt.GetMerklePath(target)
 	if err != nil {
@@ -192,7 +193,7 @@ func TestGetMerklePath_Sorted(t *testing.T) {
 	}
 	_ = indexes
 
-	root := computeRootFromPath(leafHash, path, indexes, true)
+	root := computeRootFromPath([]byte(leafHash), path, indexes, true)
 	if !bytes.Equal(root, mt.MerkleRoot()) {
 		t.Fatalf("reconstructed root mismatch (sorted)")
 	}

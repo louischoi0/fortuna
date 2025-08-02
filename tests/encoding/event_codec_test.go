@@ -25,5 +25,4 @@ func TestEncodeDecodeEvent(t *testing.T) {
 	fmt.Println(decoded)
 	fmt.Println(decoded.Hash())
 	fmt.Println(event.Hash())
-
 }
