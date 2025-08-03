@@ -4,15 +4,21 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 )
 
 const (
-	OP_SYMBOL  = '*'
-	CODE_MARK  = 'x'
-	ARG_SYMBOL = '$'
-	STR_SYMBOL = '^'
-	INT_SYMBOL = '!'
+	OP_SYMBOL     = '*'
+	OP_END_SYMBOL = ';'
+
+	CODE_MARK = 'x'
+	ARG_MARK  = '$'
+
+	STR_SYMBOL     = '"' // 시작
+	STR_END_SYMBOL = '"' // 종료
+	INT_SYMBOL     = '!' // 시작
+	INT_END_SYMBOL = '!' // 종료
+	VEC_SYMBOL     = '%' // 시작
+	VEC_END_SYMBOL = '%' // 종료
 )
 
 // ParseCompactOperation parses a compact symbolic string into an OperationRaw
@@ -72,50 +78,67 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 
 	for {
 		ch := r.peek()
-		if ch == 0 || ch == OP_SYMBOL {
-			break
-		}
-
-		if r.next() != ARG_SYMBOL {
-			return nil, fmt.Errorf("expected '$' before argument, got %q", ch)
-		}
-
-		switch r.peek() {
-		case STR_SYMBOL:
-			r.next()
-			str := r.readWhile(func(c byte) bool {
-				return c != ARG_SYMBOL && c != OP_SYMBOL
-			})
-			if str == "" {
-				return nil, fmt.Errorf("empty string after '^'")
-			}
-			op.Args = append(op.Args, str)
-
-		case INT_SYMBOL:
-			r.next()
-			numStr := r.readWhile(func(c byte) bool { return c >= '0' && c <= '9' })
-			if numStr == "" {
-				return nil, fmt.Errorf("empty int after '!'")
-			}
-			num, err := strconv.ParseInt(numStr, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid integer: %v", err)
-			}
-			op.Args = append(op.Args, num)
-
-		case OP_SYMBOL:
-			nested, err := parseOperation(r)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse nested operation: %w", err)
-			}
-			op.Args = append(op.Args, nested)
-
+		switch ch {
+		case 0:
+			return nil, errors.New("unterminated operation: missing ';'")
+		case OP_END_SYMBOL:
+			r.next() // consume ';'
+			return op, nil
 		default:
-			return nil, fmt.Errorf("unexpected character after $: %q", r.peek())
+			// expect an argument
+			if r.next() != ARG_MARK {
+				return nil, fmt.Errorf("expected '$' before argument, got %q", ch)
+			}
+
+			switch r.peek() {
+			case STR_SYMBOL:
+				// $"..."`
+				if r.next() != STR_SYMBOL {
+					return nil, errors.New(`expected '"' to start string`)
+				}
+				str := r.readWhile(func(c byte) bool {
+					return c != STR_END_SYMBOL
+				})
+				if r.next() != STR_END_SYMBOL {
+					return nil, errors.New(`unterminated string: missing '"'`)
+				}
+				op.Args = append(op.Args, str)
+
+			case INT_SYMBOL:
+				// $!123!
+				if r.next() != INT_SYMBOL {
+					return nil, errors.New("expected '!' to start int")
+				}
+				numStr := r.readWhile(func(c byte) bool { return c >= '0' && c <= '9' })
+				if numStr == "" {
+					return nil, fmt.Errorf("empty int after '!'")
+				}
+				if r.next() != INT_END_SYMBOL {
+					return nil, fmt.Errorf("unterminated int: expected closing '%c'", INT_END_SYMBOL)
+				}
+				num, err := strconv.ParseInt(numStr, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid integer: %v", err)
+				}
+				op.Args = append(op.Args, num)
+
+			case OP_SYMBOL:
+				// nested $*xNN ... ;
+				nested, err := parseOperation(r)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse nested operation: %w", err)
+				}
+				op.Args = append(op.Args, nested)
+
+			case VEC_SYMBOL:
+				// TODO: VECTOR 파싱은 추후 구현
+				return nil, errors.New("TODO: vector parsing not implemented yet")
+
+			default:
+				return nil, fmt.Errorf("unexpected character after $: %q", r.peek())
+			}
 		}
 	}
-
-	return op, nil
 }
 
 func ParseCompactOperations(input string) ([]*OperationRaw, error) {
@@ -123,6 +146,7 @@ func ParseCompactOperations(input string) ([]*OperationRaw, error) {
 	var ops []*OperationRaw
 
 	for {
+		// 공백 스킵
 		for r.peek() == ' ' || r.peek() == '\n' || r.peek() == '\t' || r.peek() == '\r' {
 			r.next()
 		}
@@ -139,46 +163,4 @@ func ParseCompactOperations(input string) ([]*OperationRaw, error) {
 	}
 
 	return ops, nil
-}
-
-func SerializeCompactOperations(ops []*OperationRaw) (string, error) {
-	var sb strings.Builder
-	for _, op := range ops {
-		if err := serializeOperation(&sb, op); err != nil {
-			return "", err
-		}
-	}
-	return sb.String(), nil
-}
-
-func serializeOperation(sb *strings.Builder, op *OperationRaw) error {
-	if op == nil {
-		return fmt.Errorf("nil operation")
-	}
-
-	// start flag
-	sb.WriteByte(OP_SYMBOL)
-
-	// OpCode
-	sb.WriteString(op.OpCode)
-
-	// Args
-	for _, arg := range op.Args {
-		sb.WriteByte(ARG_SYMBOL) // '$'
-		switch v := arg.(type) {
-		case string:
-			sb.WriteByte(STR_SYMBOL) // '^'
-			sb.WriteString(v)
-		case int64:
-			sb.WriteByte(INT_SYMBOL) // '!'
-			sb.WriteString(strconv.FormatInt(v, 10))
-		case *OperationRaw:
-			if err := serializeOperation(sb, v); err != nil {
-				return fmt.Errorf("nested operation serialize failed: %v", err)
-			}
-		default:
-			return fmt.Errorf("unsupported argument type: %T", v)
-		}
-	}
-	return nil
 }

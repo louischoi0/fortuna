@@ -10,15 +10,20 @@ import (
 
 func EncodeInt64Array(arr []int64) []byte {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, arr)
+	_ = binary.Write(buf, binary.LittleEndian, arr)
 	return buf.Bytes()
 }
 
-func DecodeInt64Array(data []byte) []int64 {
-	count := len(data)
-	result := make([]int64, count)
-	binary.Read(bytes.NewReader(data), binary.LittleEndian, &result)
-	return result
+func DecodeInt64Array(data []byte) ([]int64, error) {
+	if len(data)%8 != 0 {
+		return nil, fmt.Errorf("invalid int64 array bytes: len=%d not multiple of 8", len(data))
+	}
+	n := len(data) / 8
+	result := make([]int64, n)
+	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func EncodeInt64(n int64) []byte {

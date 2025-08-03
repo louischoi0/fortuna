@@ -72,7 +72,7 @@ func serializeOperation(sb *strings.Builder, op *Operation) error {
 	sb.WriteString(op.OpCode)
 
 	for _, arg := range op.Args {
-		sb.WriteByte(model.ARG_SYMBOL)
+		sb.WriteByte(model.ARG_MARK)
 		switch v := arg.(type) {
 		case string:
 			sb.WriteByte(model.STR_SYMBOL)
