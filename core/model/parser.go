@@ -4,17 +4,21 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
-const OP_SYMBOL = '*'
-const ARG_SYMBOL = '$'
-const STR_SYMBOL = '^'
-const INT_SYMBOL = '!'
+const (
+	OP_SYMBOL  = '*'
+	CODE_MARK  = 'x'
+	ARG_SYMBOL = '$'
+	STR_SYMBOL = '^'
+	INT_SYMBOL = '!'
+)
 
-// ParseCompactOperation parses compact symbolic string (e.g., "*&1$^abc") into OperationRaw
+// ParseCompactOperation parses a compact symbolic string into an OperationRaw
 func ParseCompactOperation(input string) (*OperationRaw, error) {
-	p := &reader{src: input, pos: 0}
-	return parseOperation(p)
+	r := &reader{src: input, pos: 0}
+	return parseOperation(r)
 }
 
 type reader struct {
@@ -51,25 +55,25 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 		return nil, fmt.Errorf("expected '*', got %q", r.peek())
 	}
 
-	if r.next() != ARG_SYMBOL {
-		return nil, fmt.Errorf("expected '&' after '*', got %q", r.peek())
+	if r.next() != CODE_MARK {
+		return nil, fmt.Errorf("expected 'x' after '*', got %q", r.peek())
 	}
 
-	// parse OpCode number
+	// read opcode number (e.g., x00 → "x00")
 	code := r.readWhile(func(c byte) bool { return c >= '0' && c <= '9' })
 	if code == "" {
-		return nil, errors.New("missing op code number after '&'")
+		return nil, errors.New("missing opcode number after 'x'")
 	}
+
 	op := &OperationRaw{
-		OpCode: string(ARG_SYMBOL) + code,
+		OpCode: string(CODE_MARK) + code,
 		Args:   []interface{}{},
 	}
 
-	// parse args
 	for {
 		ch := r.peek()
 		if ch == 0 || ch == OP_SYMBOL {
-			break // next operation or end
+			break
 		}
 
 		if r.next() != ARG_SYMBOL {
@@ -77,19 +81,21 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 		}
 
 		switch r.peek() {
-		case STR_SYMBOL: // string
+		case STR_SYMBOL:
 			r.next()
-			str := r.readWhile(func(c byte) bool { return c != ARG_SYMBOL && c != OP_SYMBOL })
+			str := r.readWhile(func(c byte) bool {
+				return c != ARG_SYMBOL && c != OP_SYMBOL
+			})
 			if str == "" {
-				return nil, fmt.Errorf("empty string value after '^'")
+				return nil, fmt.Errorf("empty string after '^'")
 			}
 			op.Args = append(op.Args, str)
 
-		case INT_SYMBOL: // integer
+		case INT_SYMBOL:
 			r.next()
 			numStr := r.readWhile(func(c byte) bool { return c >= '0' && c <= '9' })
 			if numStr == "" {
-				return nil, fmt.Errorf("empty int value after '!'")
+				return nil, fmt.Errorf("empty int after '!'")
 			}
 			num, err := strconv.ParseInt(numStr, 10, 64)
 			if err != nil {
@@ -97,10 +103,10 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 			}
 			op.Args = append(op.Args, num)
 
-		case OP_SYMBOL: // nested operation
+		case OP_SYMBOL:
 			nested, err := parseOperation(r)
 			if err != nil {
-				return nil, fmt.Errorf("nested operation parse failed: %v", err)
+				return nil, fmt.Errorf("failed to parse nested operation: %w", err)
 			}
 			op.Args = append(op.Args, nested)
 
@@ -110,4 +116,69 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 	}
 
 	return op, nil
+}
+
+func ParseCompactOperations(input string) ([]*OperationRaw, error) {
+	r := &reader{src: input, pos: 0}
+	var ops []*OperationRaw
+
+	for {
+		for r.peek() == ' ' || r.peek() == '\n' || r.peek() == '\t' || r.peek() == '\r' {
+			r.next()
+		}
+
+		if r.pos >= len(r.src) {
+			break
+		}
+
+		op, err := parseOperation(r)
+		if err != nil {
+			return nil, err
+		}
+		ops = append(ops, op)
+	}
+
+	return ops, nil
+}
+
+func SerializeCompactOperations(ops []*OperationRaw) (string, error) {
+	var sb strings.Builder
+	for _, op := range ops {
+		if err := serializeOperation(&sb, op); err != nil {
+			return "", err
+		}
+	}
+	return sb.String(), nil
+}
+
+func serializeOperation(sb *strings.Builder, op *OperationRaw) error {
+	if op == nil {
+		return fmt.Errorf("nil operation")
+	}
+
+	// start flag
+	sb.WriteByte(OP_SYMBOL)
+
+	// OpCode
+	sb.WriteString(op.OpCode)
+
+	// Args
+	for _, arg := range op.Args {
+		sb.WriteByte(ARG_SYMBOL) // '$'
+		switch v := arg.(type) {
+		case string:
+			sb.WriteByte(STR_SYMBOL) // '^'
+			sb.WriteString(v)
+		case int64:
+			sb.WriteByte(INT_SYMBOL) // '!'
+			sb.WriteString(strconv.FormatInt(v, 10))
+		case *OperationRaw:
+			if err := serializeOperation(sb, v); err != nil {
+				return fmt.Errorf("nested operation serialize failed: %v", err)
+			}
+		default:
+			return fmt.Errorf("unsupported argument type: %T", v)
+		}
+	}
+	return nil
 }
