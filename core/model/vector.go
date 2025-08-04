@@ -7,22 +7,20 @@ import (
 )
 
 type StateVector struct {
-	Count int
-	Data  []int64
+	Data []int64
 }
 
-func NewStateVector(count int, data []int64) *StateVector {
+func NewStateVector(data []int64) *StateVector {
 	return &StateVector{
-		Count: count,
-		Data:  data,
+		Data: data,
 	}
 }
 
-func (v *StateVector) Get(index int) int64 {
+func (v *StateVector) Get(index int64) int64 {
 	return v.Data[index]
 }
 
-func (v *StateVector) Set(index int, value int64) {
+func (v *StateVector) Set(index int64, value int64) {
 	v.Data[index] = value
 }
 
@@ -66,7 +64,7 @@ func DecodeStateVector(b []byte) (*StateVector, error) {
 		if b[i] != VEC_END_SYMBOL {
 			return nil, fmt.Errorf("invalid state vector: expected end symbol '%c'", VEC_END_SYMBOL)
 		}
-		return &StateVector{Count: 0, Data: []int64{}}, nil
+		return &StateVector{Data: []int64{}}, nil
 	}
 
 	if len(b) < i+int(size) {
@@ -90,7 +88,10 @@ func DecodeStateVector(b []byte) (*StateVector, error) {
 	}
 
 	return &StateVector{
-		Count: len(data),
-		Data:  data,
+		Data: data,
 	}, nil
+}
+
+func (v *StateVector) Size() int {
+	return len(v.Data)
 }

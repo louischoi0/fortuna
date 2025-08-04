@@ -54,7 +54,7 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count")
 	}
 
-	if int(slot_count) >= len(machine.State) {
+	if int(slot_count) >= machine.State.Size() {
 		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count is bigger than legth of machine state")
 	}
 
@@ -62,10 +62,10 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 	a := indices[0] % slot_count
 	b := indices[1] % slot_count
 
-	fmt.Printf("seed=%v, a=%v, b=%v, sa=%v, ba=%v", seed, a, b, machine.State[a], machine.State[b])
+	fmt.Printf("seed=%v, a=%v, b=%v, sa=%v, ba=%v", seed, a, b, machine.State.Get(a), machine.State.Get(b))
 
 	var result string
-	if machine.State[a] > machine.State[b] {
+	if machine.State.Get(a) > machine.State.Get(b) {
 		result = "t"
 	} else {
 		result = "f"

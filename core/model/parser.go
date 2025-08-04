@@ -13,12 +13,12 @@ const (
 	CODE_MARK = 'x'
 	ARG_MARK  = '$'
 
-	STR_SYMBOL     = '"' // 시작
-	STR_END_SYMBOL = '"' // 종료
-	INT_SYMBOL     = '!' // 시작
-	INT_END_SYMBOL = '!' // 종료
-	VEC_SYMBOL     = '%' // 시작
-	VEC_END_SYMBOL = '%' // 종료
+	STR_SYMBOL     = '"'
+	STR_END_SYMBOL = '"'
+	INT_SYMBOL     = '!'
+	INT_END_SYMBOL = '!'
+	VEC_SYMBOL     = '%'
+	VEC_END_SYMBOL = '%'
 )
 
 // ParseCompactOperation parses a compact symbolic string into an OperationRaw

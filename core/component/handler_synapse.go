@@ -40,18 +40,16 @@ func (syn *Synapse) StartUp() error {
 		}
 
 		vector := machine.StateKernel.GenVector(seed, size)
-		s, _ := json.Marshal(util.EncodeInt64Array(vector))
 
 		response := &swift.Packet{
 			Type:    swift.PacketTypeGenVectorResponse,
-			Payload: json.RawMessage(s),
+			Payload: vector.Encode(),
 		}
 
 		return syn.swift.Send(ctx, response)
 	})
 
 	syn.swift.RegisterHandler(swift.PacketTypeStateSeedAPIRequest, func(ctx context.Context, packet *swift.Packet) error {
-
 		return nil
 	})
 

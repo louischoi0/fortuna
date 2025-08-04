@@ -2,17 +2,17 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"fortuna/core/model"
 	"fortuna/rpc"
 	"fortuna/structure"
+	"log"
 
 	"github.com/spf13/cobra"
 )
 
 func CreateEventVerifyCMD() *cobra.Command {
-	var event_payload 	string
-	var event_hash 		string
+	var event_payload string
+	var event_hash string
 
 	cmd := &cobra.Command{
 		Use:   "verify",
@@ -21,7 +21,7 @@ func CreateEventVerifyCMD() *cobra.Command {
 
 		Run: func(cmd *cobra.Command, args []string) {
 			omap, err := structure.ParseOrderedMap(string(event_payload))
-			
+
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -57,6 +57,7 @@ func CreateEventEmitCMD() *cobra.Command {
 	var topic string
 	var subtopic string
 	var tag string
+	var publisher string
 
 	cmd := &cobra.Command{
 		Use:   "emit",
@@ -72,7 +73,7 @@ func CreateEventEmitCMD() *cobra.Command {
 			payload.Set("a", 3)
 
 			spec := model.NewEventSpec(interface_id, kernel_version, params)
-			event := model.NewEventRequest(space_id, payload, spec, topic, subtopic, tag)
+			event := model.NewEventRequest(publisher, space_id, payload, spec, topic, subtopic, tag)
 
 			request := rpc.CreateEventRequest(endpoint, event, auth)
 
@@ -96,6 +97,7 @@ func CreateEventEmitCMD() *cobra.Command {
 	cmd.Flags().StringVarP(&topic, "topic", "t", "", "topic")
 	cmd.Flags().StringVarP(&subtopic, "subtopic", "c", "", "subtopic")
 	cmd.Flags().StringVarP(&tag, "tag", "g", "", "tag")
+	cmd.Flags().StringVarP(&publisher, "publisher", "p", "", "publisher")
 
 	return cmd
 }

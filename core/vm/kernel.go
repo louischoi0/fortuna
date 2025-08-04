@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"fortuna/core/model"
 	"fortuna/crypto"
 	"time"
 )
@@ -12,8 +13,8 @@ const (
 )
 
 type StateKernel interface {
-	GenVector(seed string, size int64) []int64
-	VerifyVector(seed string, vector []int64) bool
+	GenVector(seed string, size int64) *model.StateVector
+	VerifyVector(seed string, vector *model.StateVector) bool
 	RandInt(seed string, minValue int64, maxValue int64) int64
 	GenIndex(seed string, minValue int64, maxValue int64, size int64) []int64
 
@@ -42,7 +43,7 @@ func (ck *BasicStateKernel) GenStateSeed() (string, string) {
 	return seed, payload
 }
 
-func (ck *BasicStateKernel) GenVector(seed string, size int64) []int64 {
+func (ck *BasicStateKernel) GenVector(seed string, size int64) *model.StateVector {
 	res := make([]int64, size)
 
 	seed_bytes := []byte(seed)
@@ -51,17 +52,18 @@ func (ck *BasicStateKernel) GenVector(seed string, size int64) []int64 {
 	for i := range size {
 		res[i] = rng.NextInt64()
 	}
-	return res
+
+	return model.NewStateVector(res)
 }
 
-func (ck *BasicStateKernel) VerifyVector(seed string, vec []int64) bool {
+func (ck *BasicStateKernel) VerifyVector(seed string, vec *model.StateVector) bool {
 	seed_bytes := []byte(seed)
 	rng := crypto.NewCSPRNG(seed_bytes)
 
-	for i := range len(vec) {
+	for i := range vec.Size() {
 		expected := rng.NextInt64()
 
-		if expected != vec[i] {
+		if expected != vec.Get(int64(i)) {
 			return false
 		}
 	}
@@ -76,7 +78,7 @@ func (ck *BasicStateKernel) GenIndex(seed string, s int64, e int64, size int64) 
 
 	for i := range size {
 		v := rng.NextInt64()
-		res[i] = int64((uint64(v) % uint64(e)) + uint64(s))
+		res[i] = (v % e) + s
 	}
 	return res
 }

@@ -78,7 +78,7 @@ func (s *TCPServer) HandleConnection(conn net.Conn) error {
 			return fmt.Errorf("failed to read header: %v", err)
 		}
 
-		packetLen := binary.BigEndian.Uint32(header)
+		packetLen := binary.LittleEndian.Uint32(header)
 		packetBytes := make([]byte, packetLen)
 
 		if _, err := io.ReadFull(conn, packetBytes); err != nil {
@@ -127,7 +127,7 @@ func (s *TCPServer) Send(ctx context.Context, packet *Packet) error {
 	}
 
 	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, uint32(len(packetBytes)))
+	binary.LittleEndian.PutUint32(header, uint32(len(packetBytes)))
 
 	if _, err := connInfo.Write(header); err != nil {
 		return fmt.Errorf("failed to send header: %v", err)

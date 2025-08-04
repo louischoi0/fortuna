@@ -1,34 +1,34 @@
 package rpc
 
 import (
-	"time"
-	"io"
-	"net"
-	"log"
-	"encoding/json"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"fortuna/core/model"
 	"fortuna/swift"
+	"io"
+	"log"
+	"net"
+	"time"
 )
 
 func NewRawRequest(peer string, packetType swift.PacketType, payload string) *RawRequest {
 	return &RawRequest{
-		Type: packetType,
+		Type:    packetType,
 		Payload: payload,
-		Peer: peer,
+		Peer:    peer,
 	}
 }
 
 type RawRequest struct {
-	Type	swift.PacketType
+	Type    swift.PacketType
 	Payload string
-	Peer 	string
-	Auth	string
+	Peer    string
+	Auth    string
 }
 
-func (raw *RawRequest) A(auth string) *RawRequest{
-	raw.Auth = auth	
+func (raw *RawRequest) A(auth string) *RawRequest {
+	raw.Auth = auth
 	return raw
 }
 
@@ -38,12 +38,12 @@ func (req *RawRequest) Call() (swift.Packet, error) {
 		Payload: json.RawMessage(req.Payload),
 	}
 
-	return CallRPC(req.Peer,  packet)
+	return CallRPC(req.Peer, packet)
 }
 
 func CreateRequest(packetType swift.PacketType, peer, payload string) *RawRequest {
 	req := RawRequest{
-		Type: packetType,
+		Type:    packetType,
 		Payload: payload,
 		Peer:    peer,
 	}
@@ -54,7 +54,7 @@ func CreateRequest(packetType swift.PacketType, peer, payload string) *RawReques
 func CreateEventRequest(peer string, event *model.Event, authorization string) *RawRequest {
 	log.Print("event payload: ", event.String())
 	req := RawRequest{
-		Type: swift.PacketTypeEmitEventRequest,
+		Type:    swift.PacketTypeEmitEventRequest,
 		Payload: event.String(),
 		Peer:    peer,
 	}
@@ -79,7 +79,7 @@ func CallRPC(targetNode string, packet swift.Packet) (swift.Packet, error) {
 
 	packetLen := uint32(len(packetData))
 	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, packetLen)
+	binary.LittleEndian.PutUint32(header, packetLen)
 
 	if _, err := conn.Write(header); err != nil {
 		return nullpacket, fmt.Errorf("Failed to send header: %v", err)
@@ -88,16 +88,16 @@ func CallRPC(targetNode string, packet swift.Packet) (swift.Packet, error) {
 		return nullpacket, fmt.Errorf("Failed to send packet: %v", err)
 	}
 
-	if err := conn.SetReadDeadline(time.Now().Add(time.Second*2)); err != nil {
-        	return nullpacket, fmt.Errorf("Failed to set read deadline: %v", err)
-    	}
+	if err := conn.SetReadDeadline(time.Now().Add(time.Second * 2)); err != nil {
+		return nullpacket, fmt.Errorf("Failed to set read deadline: %v", err)
+	}
 
 	respHeader := make([]byte, 4)
 	if _, err := io.ReadFull(conn, respHeader); err != nil {
 		return nullpacket, fmt.Errorf("Failed to read response header: %v", err)
 	}
 
-	respPacketLen := binary.BigEndian.Uint32(respHeader)
+	respPacketLen := binary.LittleEndian.Uint32(respHeader)
 
 	respData := make([]byte, respPacketLen)
 	if _, err := io.ReadFull(conn, respData); err != nil {

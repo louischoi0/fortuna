@@ -17,7 +17,7 @@ type StateMachine struct {
 	Universe   *Universe
 	LastHeight int64
 
-	State      []int64
+	State      *model.StateVector
 	StateSeed  string
 	StateHash  string
 	StateCount int64
@@ -36,7 +36,7 @@ func NewBasicStateMachine(universe *Universe, SpaceID string, stateCount int64) 
 		Universe:    universe,
 		SpaceID:     SpaceID,
 		StateCount:  stateCount,
-		State:       make([]int64, stateCount, stateCount),
+		State:       model.NewStateVector(make([]int64, stateCount)),
 		StateKernel: &BasicStateKernel{},
 	}
 	return machine
@@ -47,13 +47,14 @@ func (machine *StateMachine) EmitEventResult(event *model.Event) (*model.EventEx
 	return er, nil
 }
 
-func (machine *StateMachine) ExecuteEvent(state []int64, tx interface{}) (interface{}, error) {
+func (machine *StateMachine) ExecuteEvent(state *model.StateVector, tx interface{}) (interface{}, error) {
 	return nil, nil
 }
 
-func (machine *StateMachine) GenState(size int64) ([]int64, string) {
+func (machine *StateMachine) GenState(size int64) (*model.StateVector, string) {
 	machine.StateSeed, _ = machine.StateKernel.GenStateSeed()
 	machine.State = machine.StateKernel.GenVector(machine.StateSeed, size)
+
 	return machine.State, machine.StateSeed
 }
 
