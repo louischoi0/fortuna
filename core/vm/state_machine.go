@@ -62,6 +62,7 @@ func (machine *StateMachine) ResetState() (string, string) {
 	state, seed := machine.GenState(machine.StateCount)
 	machine.State = state
 
+	// HASH
 	hash := ""
 	return seed, hash
 }

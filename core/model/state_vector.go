@@ -26,27 +26,20 @@ func (v *StateVector) Set(index int64, value int64) {
 
 func (v *StateVector) Encode() []byte {
 	buf := bytes.NewBuffer(nil)
-	buf.WriteByte(VEC_SYMBOL)
 
 	buffer := util.EncodeInt64Array(v.Data)
 	buffer_size := len(buffer)
 	buf.Write(util.EncodeUint32(uint32(buffer_size)))
 	buf.Write(buffer)
-	buf.WriteByte(VEC_END_SYMBOL)
 
 	return buf.Bytes()
 }
 
 func DecodeStateVector(b []byte) (*StateVector, error) {
-	if len(b) < 1+4+1 {
+	if len(b) < 4 {
 		return nil, fmt.Errorf("invalid state vector: too short")
 	}
 	i := 0
-
-	if b[i] != VEC_SYMBOL {
-		return nil, fmt.Errorf("invalid state vector: missing start symbol '%c'", VEC_SYMBOL)
-	}
-	i++
 
 	if len(b) < i+4 {
 		return nil, fmt.Errorf("invalid state vector: missing length (uint32)")
@@ -58,12 +51,6 @@ func DecodeStateVector(b []byte) (*StateVector, error) {
 	i += 4
 
 	if size == 0 {
-		if len(b) < i+1 {
-			return nil, fmt.Errorf("invalid state vector: missing end symbol")
-		}
-		if b[i] != VEC_END_SYMBOL {
-			return nil, fmt.Errorf("invalid state vector: expected end symbol '%c'", VEC_END_SYMBOL)
-		}
 		return &StateVector{Data: []int64{}}, nil
 	}
 
@@ -73,15 +60,6 @@ func DecodeStateVector(b []byte) (*StateVector, error) {
 	payload := b[i : i+int(size)]
 	i += int(size)
 
-	if len(b) < i+1 {
-		return nil, fmt.Errorf("invalid state vector: missing end symbol")
-	}
-	if b[i] != VEC_END_SYMBOL {
-		return nil, fmt.Errorf("invalid state vector: expected end symbol '%c'", VEC_END_SYMBOL)
-	}
-	i++
-
-	// 5) decode int64 array from payload
 	data, err := util.DecodeInt64Array(payload)
 	if err != nil {
 		return nil, fmt.Errorf("invalid state vector: failed to decode int64 array: %w", err)

@@ -131,8 +131,22 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 				op.Args = append(op.Args, nested)
 
 			case VEC_SYMBOL:
-				// TODO: VECTOR 파싱은 추후 구현
-				return nil, errors.New("TODO: vector parsing not implemented yet")
+				if r.next() != VEC_SYMBOL {
+					return nil, errors.New("expected '%' to start vec")
+				}
+
+				buf := r.readWhile(func(c byte) bool { return c != VEC_END_SYMBOL })
+				vec, err := DecodeStateVector([]byte(buf))
+
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse vector: %w", err)
+				}
+
+				if r.next() != VEC_END_SYMBOL {
+					return nil, errors.New(`unterminated ved: missing ']'`)
+				}
+
+				op.Args = append(op.Args, vec)
 
 			default:
 				return nil, fmt.Errorf("unexpected character after $: %q", r.peek())
