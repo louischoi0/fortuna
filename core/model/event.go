@@ -8,26 +8,27 @@ import (
 	"fortuna/structure"
 	"fortuna/util"
 	"strings"
+	"strconv"
 )
 
-const HASH_SEPERATOR = ":"
-const IDENTITY_ADDRESS_STR_LENGTH = 64
-const MODEL_HASH_STR_LENGTH = 64
-const SPACE_ID_STR_LENGTH = 64
-const INTERFACE_ID_STR_LENGTH = 12
-const KERNEL_VERSION_STR_LENGTH = 12
+const HASH_SEPERATOR 			= ":"
+const IDENTITY_ADDRESS_STR_LENGTH 	= 64
+const MODEL_HASH_STR_LENGTH 		= 64
+const SPACE_ID_STR_LENGTH 		= 64
+const INTERFACE_ID_STR_LENGTH 		= 12
+const KERNEL_VERSION_STR_LENGTH 	= 12
 
 type Identity struct {
-	Address        string `json:"address"`
-	OrganizationID string `json:"organization_id"`
-	WorkspaceID    string `json:"workspace_id"`
-	UserID         string `json:"user_id"`
+	Address        	string `json:"address"`
+	OrganizationID 	string `json:"organization_id"`
+	WorkspaceID    	string `json:"workspace_id"`
+	UserID         	string `json:"user_id"`
 }
 
 type EventSpec struct {
-	InterfaceID   string                `json:"interface_id"`
-	KernelVersion string                `json:"kernel_version"`
-	Params        *structure.OrderedMap `json:"params"`
+	InterfaceID   	string                `json:"interface_id"`
+	KernelVersion 	string                `json:"kernel_version"`
+	Params        	*structure.OrderedMap `json:"params"`
 }
 
 func NewEventSpec(interface_id string, kernel_version string, params *structure.OrderedMap) *EventSpec {
@@ -93,16 +94,18 @@ func NewEventSpecFromOrderedMap(data *structure.OrderedMap) (*EventSpec, error) 
 }
 
 type Event struct {
+	Timestamp uint64 `json:"timestamp"`
 	Publisher string `json:"publisher"`
 	SpaceID   string `json:"space_id"`
 
-	Payload *structure.OrderedMap `json:"payload"`
-	Spec    *EventSpec            `json:"spec"`
+	Payload   *structure.OrderedMap `json:"payload"`
+	Spec      *EventSpec            `json:"spec"`
 
 	Topic     string `json:"topic"`
 	Subtopic  string `json:"subtopic"`
 	Seperator string `json:"seperator"`
 	Tag       string `json:"tag"`
+
 }
 
 // DecodeEvent decodes bytes produced by (*Event).Encode() back into an Event.
@@ -140,6 +143,14 @@ func DecodeEvent(b []byte) (*Event, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read hash: %w", err)
 	}
+
+	/**
+	timestamp, err := readU64LE()
+	if err != nil {
+		return nil, fmt.Errorf("read timestamp: %w", err)
+	}
+	**/
+
 	spaceID, err := readFixedString(SPACE_ID_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read spaceID: %w", err)
@@ -213,6 +224,8 @@ func DecodeEvent(b []byte) (*Event, error) {
 	}
 
 	evt := &Event{
+		// Timestamp: timestamp,
+		Timestamp: 0,
 		SpaceID: spaceID,
 		Spec: &EventSpec{
 			InterfaceID:   ifaceID,
@@ -254,6 +267,7 @@ func (event *Event) Encode() ([]byte, error) {
 	}
 
 	buf.WriteString(hash)
+	// buf.Write(util.EncodeUint64(event.Timestamp))
 	buf.WriteString(event.SpaceID)
 	buf.WriteString(event.Spec.InterfaceID)
 	buf.WriteString(event.Spec.KernelVersion)
@@ -271,7 +285,6 @@ func (event *Event) Encode() ([]byte, error) {
 	}
 
 	buf.Write(payloadbuf)
-
 	buf.WriteString(util.PadLeftS(event.Topic, 16))
 	buf.WriteString(util.PadLeftS(event.Subtopic, 16))
 	buf.WriteString(util.PadLeftS(event.Seperator, 16))
@@ -287,6 +300,8 @@ func (event *Event) Verify(eventHash string) bool {
 func (event *Event) Hash() string {
 	var buf strings.Builder
 
+	buf.WriteString(strconv.Itoa(int(event.Timestamp)))
+	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(event.SpaceID)
 	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(event.Spec.InterfaceID)

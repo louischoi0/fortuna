@@ -16,6 +16,7 @@ type Transaction struct {
 	Params           *structure.OrderedMap `json:"params"`
 	Executed         bool
 	ParsedOperations []*OperationRaw
+	Timestamp	 int64
 	Raw              []byte
 }
 

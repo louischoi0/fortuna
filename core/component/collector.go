@@ -6,15 +6,22 @@ import (
 	"sync"
 )
 
+const COLLECTOR_EVENT_BUFFER_SIZE = 1024
+const COLLECTOR_TRANSACTION_BUFFER_SIZE = 1024
+
 type Collector struct {
 	mu sync.Mutex
 
-	MaxEventRequestsPerMinute int64
-	CurretBlock               *model.EventBlock
+	// stateDB 		  *grocksdb.DB
+	//ChainStorage		  *
 
-	eventBuffer chan *model.Event
-	swift       *swift.TCPServer
-	throthled   bool
+	Chain			   *model.Chain
+	CurrentBlock               *model.EventBlock
+
+	eventBuffer 		chan *model.Event
+	transactionBuffer 	chan *model.Transaction
+
+	swift       		*swift.TCPServer
 }
 
 type CollectorConfig struct {
@@ -24,7 +31,16 @@ type CollectorConfig struct {
 }
 
 func NewCollector(config CollectorConfig) *Collector {
-	return nil
+	/**
+	stateDB, err := rock.GetDBInstance("status.rocks")
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	**/
+	return &Collector{
+		eventBuffer: make(chan *model.Event, COLLECTOR_EVENT_BUFFER_SIZE),
+		transactionBuffer: make(chan *model.Transaction, COLLECTOR_TRANSACTION_BUFFER_SIZE),
+	}
 }
 
 func (c *Collector) Bootstrap() error {

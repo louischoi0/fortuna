@@ -21,10 +21,10 @@ type EventBlock struct {
 	UniverseHash        string
 
 	Executions   []*EventExecutionResult
-	Transactions []interface{}
+	Transactions []*Transaction
 }
 
-func (block *EventBlock) AppendTransactionExecution(tx interface{}) {
+func (block *EventBlock) AppendTransactionExecution(tx *Transaction) {
 	block.mu.Lock()
 	defer block.mu.Unlock()
 
@@ -63,3 +63,4 @@ func (block *EventBlock) Update() {
 	}
 	block.ExecutionRootHash = string(mt.MerkleRoot())
 }
+
