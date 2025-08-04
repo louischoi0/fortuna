@@ -79,6 +79,7 @@ func serializeOperation(sb *strings.Builder, op *Operation) error {
 			sb.WriteString(v)
 		case int64:
 			sb.WriteByte(model.INT_SYMBOL)
+			//TODO Bytes
 			sb.WriteString(strconv.FormatInt(v, 10))
 		case *Operation:
 			if err := serializeOperation(sb, v); err != nil {
