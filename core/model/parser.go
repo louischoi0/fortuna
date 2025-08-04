@@ -22,7 +22,7 @@ const (
 )
 
 // ParseCompactOperation parses a compact symbolic string into an OperationRaw
-func ParseCompactOperation(input string) (*OperationRaw, error) {
+func ParseCompactOperation(input string) (*Operation, error) {
 	r := &reader{src: input, pos: 0}
 	return parseOperation(r)
 }
@@ -56,7 +56,7 @@ func (r *reader) readWhile(pred func(byte) bool) string {
 	return r.src[start:r.pos]
 }
 
-func parseOperation(r *reader) (*OperationRaw, error) {
+func parseOperation(r *reader) (*Operation, error) {
 	if r.next() != OP_SYMBOL {
 		return nil, fmt.Errorf("expected '*', got %q", r.peek())
 	}
@@ -71,7 +71,7 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 		return nil, errors.New("missing opcode number after 'x'")
 	}
 
-	op := &OperationRaw{
+	op := &Operation{
 		OpCode: string(CODE_MARK) + code,
 		Args:   []interface{}{},
 	}
@@ -155,12 +155,11 @@ func parseOperation(r *reader) (*OperationRaw, error) {
 	}
 }
 
-func ParseCompactOperations(input string) ([]*OperationRaw, error) {
+func ParseCompactOperations(input string) ([]*Operation, error) {
 	r := &reader{src: input, pos: 0}
-	var ops []*OperationRaw
+	var ops []*Operation
 
 	for {
-		// 공백 스킵
 		for r.peek() == ' ' || r.peek() == '\n' || r.peek() == '\t' || r.peek() == '\r' {
 			r.next()
 		}

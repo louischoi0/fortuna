@@ -1,51 +1,46 @@
-package vm
+package model
 
 import (
 	"fmt"
-	"fortuna/core/model"
 	"strconv"
 	"strings"
 )
 
 type Operation struct {
-	Universe *Universe
-	Machine  *StateMachine
-
 	OpCode string
 	OpName string
 	Args   []interface{}
 }
 
-type ABI struct {
-	Universe *Universe
-	Machine  *StateMachine
+func NewOperation(opCode string, opName string, args []interface{}) *Operation {
+	return &Operation{
+		OpCode: opCode,
+		OpName: opName,
+		Args:   args,
+	}
 }
 
-func (o *Operation) WriteVar(v *model.Var) *Operation {
+type ABI struct {
+}
+
+func (o *ABI) WriteVar(v *Var) *Operation {
 	return &Operation{
-		Universe: o.Universe,
-		Machine:  o.Machine,
-		OpCode:   "x0",
-		OpName:   "write_var",
-		Args:     []interface{}{v},
+		OpCode: "x0",
+		OpName: "write_var",
+		Args:   []interface{}{v},
 	}
 }
 
 func (o *ABI) ReadVar(address string) *Operation {
 	return &Operation{
-		Universe: o.Universe,
-		Machine:  o.Machine,
-		OpCode:   "x1",
-		OpName:   "read_var",
-		Args:     []interface{}{address},
+		OpCode: "x1",
+		OpName: "read_var",
+		Args:   []interface{}{address},
 	}
 }
 
-func (o *ABI) WriteMachineState(vector []int64) *Operation {
+func (o *ABI) WriteMachineState(vector *StateVector) *Operation {
 	return &Operation{
-		Universe: o.Universe,
-		Machine:  o.Machine,
-
 		OpCode: "x2",
 		OpName: "write_machine_state",
 		Args:   []interface{}{vector},
@@ -67,20 +62,24 @@ func serializeOperation(sb *strings.Builder, op *Operation) error {
 		return fmt.Errorf("nil operation")
 	}
 
-	sb.WriteByte(model.OP_SYMBOL)
-
+	sb.WriteByte(OP_SYMBOL)
 	sb.WriteString(op.OpCode)
 
 	for _, arg := range op.Args {
-		sb.WriteByte(model.ARG_MARK)
+		sb.WriteByte(ARG_MARK)
 		switch v := arg.(type) {
 		case string:
-			sb.WriteByte(model.STR_SYMBOL)
+			sb.WriteByte(STR_SYMBOL)
 			sb.WriteString(v)
+			sb.WriteByte(STR_END_SYMBOL)
 		case int64:
-			sb.WriteByte(model.INT_SYMBOL)
-			//TODO Bytes
+			sb.WriteByte(INT_SYMBOL)
 			sb.WriteString(strconv.FormatInt(v, 10))
+			sb.WriteByte(INT_END_SYMBOL)
+		case *StateVector:
+			sb.WriteByte(VEC_SYMBOL)
+			sb.Write(v.Encode())
+			sb.WriteByte(VEC_END_SYMBOL)
 		case *Operation:
 			if err := serializeOperation(sb, v); err != nil {
 				return fmt.Errorf("nested operation serialize failed: %v", err)
@@ -89,5 +88,6 @@ func serializeOperation(sb *strings.Builder, op *Operation) error {
 			return fmt.Errorf("unsupported argument type: %T", v)
 		}
 	}
+	sb.WriteByte(OP_END_SYMBOL)
 	return nil
 }
