@@ -21,9 +21,8 @@ const (
 	VEC_END_SYMBOL = '%'
 )
 
-// ParseCompactOperation parses a compact symbolic string into an OperationRaw
-func ParseCompactOperation(input string) (*Operation, error) {
-	r := &reader{src: input, pos: 0}
+func ParseCompactOperation(input []byte) (*Operation, error) {
+	r := &reader{src: string(input), pos: 0}
 	return parseOperation(r)
 }
 

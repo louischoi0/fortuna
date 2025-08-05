@@ -5,5 +5,5 @@ import (
 )
 
 func Now() int64 {
-	return time.Now().Unix()
+	return time.Now().UnixNano()
 }

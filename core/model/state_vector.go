@@ -10,6 +10,13 @@ type StateVector struct {
 	Data []int64
 }
 
+func (v *StateVector) Var() *Var {
+	return &Var{
+		Value: v,
+		Type: VarTypeVector,
+	}
+}
+
 func NewStateVector(data []int64) *StateVector {
 	return &StateVector{
 		Data: data,

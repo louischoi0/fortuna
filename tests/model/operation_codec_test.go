@@ -13,10 +13,13 @@ func TestOperationCodec(t *testing.T) {
 		t.Fatalf("failed to serialize operation: %v", err)
 	}
 
-	op, err := model.ParseCompactOperation(op_str)
+	op, err := model.ParseCompactOperation([]byte(op_str))
 	if err != nil {
 		t.Fatalf("failed to parse operation: %v", err)
 	}
 
-	t.Logf("operation: %s", op)
+	if len(op.Args) != 1 {
+		t.Fatalf("args length mismatched: %v, %v", len(o.Args), len(op.Args))
+	}
+
 }

@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 	"strconv"
-	"strings"
+	"bytes"
 )
 
 type Operation struct {
@@ -20,44 +20,45 @@ func NewOperation(opCode string, opName string, args []interface{}) *Operation {
 	}
 }
 
-type ABI struct {
-}
 
-func (o *ABI) WriteVar(v *Var) *Operation {
-	return &Operation{
-		OpCode: "x0",
-		OpName: "write_var",
-		Args:   []interface{}{v},
-	}
-}
+func SerializeCompactOperations(ops []*Operation) ([]byte, error) {
+	var sb bytes.Buffer
 
-func (o *ABI) ReadVar(address string) *Operation {
-	return &Operation{
-		OpCode: "x1",
-		OpName: "read_var",
-		Args:   []interface{}{address},
-	}
-}
-
-func (o *ABI) WriteMachineState(vector *StateVector) *Operation {
-	return &Operation{
-		OpCode: "x2",
-		OpName: "write_machine_state",
-		Args:   []interface{}{vector},
-	}
-}
-
-func SerializeCompactOperations(ops []*Operation) (string, error) {
-	var sb strings.Builder
 	for _, op := range ops {
 		if err := serializeOperation(&sb, op); err != nil {
-			return "", err
+			return nil, err
 		}
 	}
-	return sb.String(), nil
+	return sb.Bytes(), nil
 }
 
-func serializeOperation(sb *strings.Builder, op *Operation) error {
+func serializeVar(sb *bytes.Buffer, arg interface{}) error {
+	switch v := arg.(type) {
+	case string:
+		sb.WriteByte(STR_SYMBOL)
+		sb.WriteString(v)
+		sb.WriteByte(STR_END_SYMBOL)
+	case int64:
+		sb.WriteByte(INT_SYMBOL)
+		sb.WriteString(strconv.FormatInt(v, 10))
+		sb.WriteByte(INT_END_SYMBOL)
+	case *StateVector:
+		sb.WriteByte(VEC_SYMBOL)
+		sb.Write(v.Encode())
+		sb.WriteByte(VEC_END_SYMBOL)
+	case *Var:
+		return serializeVar(sb, v.Value)
+	case *Operation:
+		if err := serializeOperation(sb, v); err != nil {
+			return fmt.Errorf("nested operation serialize failed: %v", err)
+		}
+	default:
+		return fmt.Errorf("unsupported argument type: %T", v)
+	}
+	return nil
+}
+
+func serializeOperation(sb *bytes.Buffer, op *Operation) error {
 	if op == nil {
 		return fmt.Errorf("nil operation")
 	}
@@ -67,25 +68,8 @@ func serializeOperation(sb *strings.Builder, op *Operation) error {
 
 	for _, arg := range op.Args {
 		sb.WriteByte(ARG_MARK)
-		switch v := arg.(type) {
-		case string:
-			sb.WriteByte(STR_SYMBOL)
-			sb.WriteString(v)
-			sb.WriteByte(STR_END_SYMBOL)
-		case int64:
-			sb.WriteByte(INT_SYMBOL)
-			sb.WriteString(strconv.FormatInt(v, 10))
-			sb.WriteByte(INT_END_SYMBOL)
-		case *StateVector:
-			sb.WriteByte(VEC_SYMBOL)
-			sb.Write(v.Encode())
-			sb.WriteByte(VEC_END_SYMBOL)
-		case *Operation:
-			if err := serializeOperation(sb, v); err != nil {
-				return fmt.Errorf("nested operation serialize failed: %v", err)
-			}
-		default:
-			return fmt.Errorf("unsupported argument type: %T", v)
+		if err:= serializeVar(sb, arg); err != nil {
+			return err
 		}
 	}
 	sb.WriteByte(OP_END_SYMBOL)

@@ -2,6 +2,7 @@ package vm
 
 import (
 	"fortuna/core/model"
+	"fortuna/structure"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type ResetStateSignal struct {
 }
 
 type StateMachine struct {
+	Address	   string
 	SpaceID    string
 	Universe   *Universe
 	LastHeight int64
@@ -69,3 +71,14 @@ func (machine *StateMachine) ResetState() (string, string) {
 func (machine *StateMachine) VerifyMachineState() bool {
 	return machine.StateKernel.VerifyVector(machine.StateSeed, machine.State)
 }
+
+func (machine *StateMachine) NewLogMachineStateTransaction() *model.Transaction {
+	params := structure.NewOrderedMap()
+
+	return &model.Transaction{
+		SpaceID: machine.SpaceID,
+		From:    machine.Address,
+		Params:  params,
+	}
+}
+

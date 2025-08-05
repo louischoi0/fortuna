@@ -3,9 +3,10 @@ package model
 import (
 	"fortuna/crypto"
 	"fortuna/structure"
+	"fortuna/util"
 	"strconv"
 	"strings"
-	"time"
+	"bytes"
 )
 
 type Transaction struct {
@@ -19,34 +20,35 @@ type Transaction struct {
 
 func NewTransaction(spaceID string, from string, params *structure.OrderedMap) *Transaction {
 	return &Transaction{
-		Timestamp:  time.Now().Unix(),
+		Timestamp:  util.Now(),
 		Operations: []*Operation{},
 		RawCode:    []byte{},
 	}
 }
 
-func NewLogMachineStateTransaction(spaceID string, from string, params *structure.OrderedMap) *Transaction {
-	return &Transaction{
-		SpaceID: spaceID,
-		From:    from,
-		Params:  params,
-	}
+func (t *Transaction) Encode() []byte {
+	var buf bytes.Buffer
+	return buf.Bytes()
 }
 
-func (t *Transaction) Hash() string {
+func (tx *Transaction) Verify(hash string) bool {
+	return tx.Hash() ==  hash 
+}
+
+func (tx *Transaction) Hash() string {
 	var buf strings.Builder
 
-	t.UpdateRawCode()
+	tx.UpdateRawCode()
 
-	buf.WriteString(strconv.Itoa(int(t.Timestamp)))
+	buf.WriteString(strconv.Itoa(int(tx.Timestamp)))
 	buf.WriteString(HASH_SEPERATOR)
-	buf.WriteString(t.SpaceID)
+	buf.WriteString(tx.SpaceID)
 	buf.WriteString(HASH_SEPERATOR)
-	buf.WriteString(t.From)
+	buf.WriteString(tx.From)
 	buf.WriteString(HASH_SEPERATOR)
-	buf.WriteString(t.Params.Hash())
+	buf.WriteString(tx.Params.Hash())
 	buf.WriteString(HASH_SEPERATOR)
-	buf.WriteString(string(t.RawCode))
+	buf.WriteString(string(tx.RawCode))
 
 	return crypto.SHA256(buf.String())
 }
