@@ -43,7 +43,7 @@ func (sr *Subroutine) AddOperation(op *model.Operation) {
 	sr.Operations = append(sr.Operations, op)
 }
 
-func NewLogMachineStateSubroutine(machineID string, stateVector model.StateVector) *Subroutine {
+func NewLogMachineStateSubroutine(machineID string, stateVector *model.StateVector) *Subroutine {
 	subroutine := &Subroutine{}
 	abi := &ABI{}
 

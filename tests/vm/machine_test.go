@@ -14,4 +14,7 @@ func TestMachine(t *testing.T) {
         fmt.Println(res)                                                        
 	res = machine.StateKernel.VerifyVector("abcdef", machine.State)
         fmt.Println(res)                                                        
+
+	tx := machine.NewLogMachineStateTransaction()
+	encoded := tx.Encode()
 }                                                                               

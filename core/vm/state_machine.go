@@ -14,7 +14,7 @@ type ResetStateSignal struct {
 }
 
 type StateMachine struct {
-	Address	   string
+	ID	   string
 	SpaceID    string
 	Universe   *Universe
 	LastHeight int64
@@ -74,11 +74,13 @@ func (machine *StateMachine) VerifyMachineState() bool {
 
 func (machine *StateMachine) NewLogMachineStateTransaction() *model.Transaction {
 	params := structure.NewOrderedMap()
-
+	subroutine := NewLogMachineStateSubroutine(machine.ID, machine.State)
+	
 	return &model.Transaction{
 		SpaceID: machine.SpaceID,
-		From:    machine.Address,
+		From:    machine.ID,
 		Params:  params,
+		Operations: subroutine.Operations,
 	}
 }
 

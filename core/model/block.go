@@ -3,44 +3,64 @@ package model
 import (
 	"fortuna/crypto"
 	"fortuna/structure"
+	"fortuna/util"
 	"strings"
 	"sync"
 )
 
-type EventBlock struct {
-	mu sync.Mutex
+type Block struct {
+	mu 			sync.Mutex
 
-	SpaceID           string
-	Height            int64
-	Count             int64
-	PreviousBlockHash string
-	PreviousBlock     *EventBlock
+	SpaceID           	string
+	Height            	int64
+	Count             	int64
+	PreviousBlockHash 	string
+	PreviousBlock     	*Block
 
-	ExecutionRootHash   string
-	TransactionRootHash string
-	UniverseHash        string
+	ExecutionRootHash   	string
+	TransactionRootHash 	string
+	UniverseHash        	string
 
-	Executions   []*EventExecutionResult
-	Transactions []*Transaction
+	Executions   		[]*EventExecutionResult
+	Transactions 		[]*Transaction
 }
 
-func (block *EventBlock) AppendTransactionExecution(tx *Transaction) {
+func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
+	var phash string
+	if prevBlock != nil {
+		phash = prevBlock.Hash()
+	}
+
+	return &Block{
+		SpaceID: spaceID,
+		Height: height, 
+		Count: 0,
+		PreviousBlock: prevBlock,
+		PreviousBlockHash: phash,
+		Executions: make([]*EventExecutionResult, 0, 50),
+		Transactions: make([]*Transaction, 0, 30),
+	}
+}
+
+func (block *Block) AppendTransactionExecution(tx *Transaction) {
 	block.mu.Lock()
 	defer block.mu.Unlock()
 
 	block.Transactions = append(block.Transactions, tx)
 }
 
-func (block *EventBlock) AppendEventExecution(er *EventExecutionResult) {
+func (block *Block) AppendEventExecution(er *EventExecutionResult) {
 	block.mu.Lock()
 	defer block.mu.Unlock()
 
 	block.Executions = append(block.Executions, er)
 }
 
-func (block *EventBlock) Hash() string {
+func (block *Block) Hash() string {
 	var buf strings.Builder
 
+	buf.Write(util.EncodeUint64(uint64(block.Height)))
+	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(block.PreviousBlockHash)
 	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(block.ExecutionRootHash)
@@ -52,7 +72,19 @@ func (block *EventBlock) Hash() string {
 	return crypto.SHA256(buf.String())
 }
 
-func (block *EventBlock) Update() {
+func (block *Block) UpdateTransactionRoot() {
+	contents := make([]structure.Content, len(block.Transactions))
+	for i, er := range block.Transactions {
+		contents[i] = er
+	}
+	mt, err := structure.NewTree(contents)
+	if err != nil {
+		panic(err)
+	}
+	block.TransactionRootHash = string(mt.MerkleRoot())
+}
+
+func (block *Block) UpdateExecutionRoot() {
 	contents := make([]structure.Content, len(block.Executions))
 	for i, er := range block.Executions {
 		contents[i] = er

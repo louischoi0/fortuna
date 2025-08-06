@@ -5,10 +5,10 @@ import (
 )
 
 type Chain struct {
-	SpaceID string
-	Blocks  []*EventBlock
+	SpaceID 	string
+	Blocks  	[]*Block
 
-	LastHeight     int64
-	LastAppendedAt time.Time
-	LastVerifiedAt time.Time
+	LastHeight     	int64
+	LastAppendedAt 	time.Time
+	LastVerifiedAt 	time.Time
 }

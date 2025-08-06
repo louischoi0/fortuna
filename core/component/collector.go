@@ -16,7 +16,7 @@ type Collector struct {
 	//ChainStorage		  *
 
 	Chain			   *model.Chain
-	CurrentBlock               *model.EventBlock
+	CurrentBlock               *model.Block
 
 	eventBuffer 		chan *model.Event
 	transactionBuffer 	chan *model.Transaction
@@ -29,6 +29,7 @@ type CollectorConfig struct {
 	EventBufferSize           int64
 	TransactionBufferSize     int64
 }
+
 
 func NewCollector(config CollectorConfig) *Collector {
 	/**
@@ -46,3 +47,12 @@ func NewCollector(config CollectorConfig) *Collector {
 func (c *Collector) Bootstrap() error {
 	return nil
 }
+
+func (c *Collector) CommitBlock() error {
+	return nil
+}
+
+func (c *Collector) VerifyEventExecution(event *EventExecution) error {
+	return nil
+}
+
