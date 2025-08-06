@@ -15,13 +15,13 @@ type Collector struct {
 	// stateDB 		  *grocksdb.DB
 	//ChainStorage		  *
 
-	Chain			   *model.Chain
-	CurrentBlock               *model.Block
+	Chain        *model.Chain
+	CurrentBlock *model.Block
 
-	eventBuffer 		chan *model.Event
-	transactionBuffer 	chan *model.Transaction
+	eventBuffer       chan *model.Event
+	transactionBuffer chan *model.Transaction
 
-	swift       		*swift.TCPServer
+	swift *swift.TCPServer
 }
 
 type CollectorConfig struct {
@@ -29,7 +29,6 @@ type CollectorConfig struct {
 	EventBufferSize           int64
 	TransactionBufferSize     int64
 }
-
 
 func NewCollector(config CollectorConfig) *Collector {
 	/**
@@ -39,7 +38,7 @@ func NewCollector(config CollectorConfig) *Collector {
 	}
 	**/
 	return &Collector{
-		eventBuffer: make(chan *model.Event, COLLECTOR_EVENT_BUFFER_SIZE),
+		eventBuffer:       make(chan *model.Event, COLLECTOR_EVENT_BUFFER_SIZE),
 		transactionBuffer: make(chan *model.Transaction, COLLECTOR_TRANSACTION_BUFFER_SIZE),
 	}
 }
@@ -52,7 +51,6 @@ func (c *Collector) CommitBlock() error {
 	return nil
 }
 
-func (c *Collector) VerifyEventExecution(event *EventExecution) error {
+func (c *Collector) VerifyEventExecution(event *model.EventExecutionResult) error {
 	return nil
 }
-

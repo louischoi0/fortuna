@@ -1,9 +1,9 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
-	"bytes"
 )
 
 type Operation struct {
@@ -19,7 +19,6 @@ func NewOperation(opCode string, opName string, args []interface{}) *Operation {
 		Args:   args,
 	}
 }
-
 
 func SerializeCompactOperations(ops []*Operation) ([]byte, error) {
 	var sb bytes.Buffer
@@ -38,8 +37,14 @@ func serializeVar(sb *bytes.Buffer, arg interface{}) error {
 		sb.WriteByte(STR_SYMBOL)
 		sb.WriteString(v)
 		sb.WriteByte(STR_END_SYMBOL)
+	case int:
+		sb.WriteByte(INT_SYMBOL)
+		// TODO
+		sb.WriteString(strconv.FormatInt(int64(v), 10))
+		sb.WriteByte(INT_END_SYMBOL)
 	case int64:
 		sb.WriteByte(INT_SYMBOL)
+		// TODO
 		sb.WriteString(strconv.FormatInt(v, 10))
 		sb.WriteByte(INT_END_SYMBOL)
 	case *StateVector:
@@ -68,7 +73,7 @@ func serializeOperation(sb *bytes.Buffer, op *Operation) error {
 
 	for _, arg := range op.Args {
 		sb.WriteByte(ARG_MARK)
-		if err:= serializeVar(sb, arg); err != nil {
+		if err := serializeVar(sb, arg); err != nil {
 			return err
 		}
 	}
