@@ -2,8 +2,8 @@ package service
 
 import (
 	"fortuna/core/model"
+	"fortuna/core/storage"
 	"fortuna/swift"
-	"fortuna/storage"
 	"sync"
 )
 
@@ -11,16 +11,16 @@ const EVENT_BUFFER_SIZE = 1024
 const TRANSACTION_BUFFER_SIZE = 1024
 
 type Oracle struct {
-	mu 			sync.Mutex
-	storage 		*storage.ChainStorage
+	mu      sync.Mutex
+	storage *storage.FileStorage
 
-	Chain			*model.Chain
-	CurrentBlock            *model.Block
+	Chain        *model.Chain
+	CurrentBlock *model.Block
 
-	eventBuffer 		chan *model.Event
-	transactionBuffer 	chan *model.Transaction
+	eventBuffer       chan *model.Event
+	transactionBuffer chan *model.Transaction
 
-	swift       		*swift.TCPServer
+	swift *swift.TCPServer
 }
 
 type OracleConfig struct {
@@ -28,7 +28,6 @@ type OracleConfig struct {
 	EventBufferSize           int64
 	TransactionBufferSize     int64
 }
-
 
 func NewOracle(config OracleConfig) *Oracle {
 	/**
@@ -38,7 +37,7 @@ func NewOracle(config OracleConfig) *Oracle {
 	}
 	**/
 	return &Oracle{
-		eventBuffer: make(chan *model.Event, EVENT_BUFFER_SIZE),
+		eventBuffer:       make(chan *model.Event, EVENT_BUFFER_SIZE),
 		transactionBuffer: make(chan *model.Transaction, TRANSACTION_BUFFER_SIZE),
 	}
 }
@@ -47,3 +46,6 @@ func (c *Oracle) Bootstrap() error {
 	return nil
 }
 
+func (c *Oracle) WriteBlock(block *model.Block) error {
+	return nil
+}

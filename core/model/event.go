@@ -150,6 +150,11 @@ func DecodeEvent(b []byte) (*Event, error) {
 		return nil, fmt.Errorf("read timestamp: %w", err)
 	}
 
+	publisher, err := readFixedString(IDENTITY_ADDRESS_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read publisher: %w", err)
+	}
+
 	spaceID, err := readFixedString(SPACE_ID_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read spaceID: %w", err)
@@ -224,6 +229,7 @@ func DecodeEvent(b []byte) (*Event, error) {
 
 	evt := &Event{
 		Timestamp: timestamp,
+		Publisher: publisher,
 		SpaceID:   spaceID,
 		Spec: &EventSpec{
 			InterfaceID:   ifaceID,
@@ -256,6 +262,10 @@ func (event *Event) Encode() ([]byte, error) {
 		return nil, fmt.Errorf("spaceID must have length: %d", SPACE_ID_STR_LENGTH)
 	}
 
+	if len(event.Publisher) != IDENTITY_ADDRESS_STR_LENGTH {
+		return nil, fmt.Errorf("publisher must have length: %d", IDENTITY_ADDRESS_STR_LENGTH)
+	}
+
 	if len(event.Spec.InterfaceID) != INTERFACE_ID_STR_LENGTH {
 		return nil, fmt.Errorf("interfaceID must have length: %d", INTERFACE_ID_STR_LENGTH)
 	}
@@ -266,6 +276,7 @@ func (event *Event) Encode() ([]byte, error) {
 
 	buf.WriteString(hash)
 	buf.Write(util.EncodeUint64(event.Timestamp))
+	buf.WriteString(event.Publisher)
 	buf.WriteString(event.SpaceID)
 	buf.WriteString(event.Spec.InterfaceID)
 	buf.WriteString(event.Spec.KernelVersion)
@@ -487,6 +498,9 @@ func (xr *EventExecutionResult) Encode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	eventBufferSize := uint64(len(eventBuffer))
+	buf.Write(util.EncodeUint64(eventBufferSize))
 	buf.Write(eventBuffer)
 
 	resultSize := uint64(len(xr.Result))
@@ -521,4 +535,89 @@ func (xr *EventExecutionResult) Map() *structure.OrderedMap {
 	}
 
 	return om
+}
+
+func DecodeEventExecutionResult(b []byte) (*EventExecutionResult, error) {
+	var (
+		off = 0
+		n   = len(b)
+	)
+
+	need := func(k int) error {
+		if off+k > n {
+			return fmt.Errorf("buffer underflow: need %d bytes", k)
+		}
+		return nil
+	}
+	readFixedString := func(k int) (string, error) {
+		if err := need(k); err != nil {
+			return "", err
+		}
+		s := string(b[off : off+k])
+		off += k
+		return s, nil
+	}
+	readU64LE := func() (uint64, error) {
+		if err := need(8); err != nil {
+			return 0, err
+		}
+		v, err := util.DecodeUint64(b[off : off+8])
+		if err != nil {
+			return 0, err
+		}
+		off += 8
+		return v, nil
+	}
+
+	// 1. Read hash
+	hash, err := readFixedString(MODEL_HASH_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read hash: %w", err)
+	}
+
+	// 2. Read event buffer size
+	eventSize, err := readU64LE()
+	if err != nil {
+		return nil, fmt.Errorf("read event size: %w", err)
+	}
+
+	if err := need(int(eventSize)); err != nil {
+		return nil, fmt.Errorf("read event buffer: %w", err)
+	}
+	eventBuf := b[off : off+int(eventSize)]
+	off += int(eventSize)
+
+	event, err := DecodeEvent(eventBuf)
+	if err != nil {
+		return nil, fmt.Errorf("decode event: %w", err)
+	}
+
+	// 3. Read result size
+	resultSize, err := readU64LE()
+	if err != nil {
+		return nil, fmt.Errorf("read result size: %w", err)
+	}
+
+	if err := need(int(resultSize)); err != nil {
+		return nil, fmt.Errorf("read result buffer: %w", err)
+	}
+	resultBytes := b[off : off+int(resultSize)]
+	result := string(resultBytes)
+
+	// 4. Compose object
+	exec := &EventExecutionResult{
+		Event:     event,
+		EventHash: hash,
+		Result:    result,
+		Err:       nil, // not included in current encoding
+	}
+
+	fmt.Println("gotevent")
+	fmt.Println(event)
+	// 5. Verify hash
+	if got := event.Hash(); got != exec.EventHash {
+		return nil, fmt.Errorf("hash mismatch: expected %s, got %s", hash, got)
+	}
+
+	return exec, nil
 }
