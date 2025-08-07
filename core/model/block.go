@@ -5,13 +5,19 @@ import (
 	"fortuna/structure"
 	"fortuna/util"
 	"strings"
+	"fmt"
+	"bytes"
 	"sync"
 )
+
+const BLOCK_HASH_STR_LENGTH = 64
 
 type Block struct {
 	mu 			sync.Mutex
 
 	SpaceID           	string
+	Timestamp		int64
+
 	Height            	int64
 	Count             	int64
 	PreviousBlockHash 	string
@@ -94,5 +100,70 @@ func (block *Block) UpdateExecutionRoot() {
 		panic(err)
 	}
 	block.ExecutionRootHash = string(mt.MerkleRoot())
+}
+
+func (block *Block) Verify() error {
+	if !(len(block.Transactions) == 0 && len(block.Executions) == 0) {
+		return fmt.Errorf("block has no transaction and event")
+	}
+
+	if block.Height == 0 {
+		return fmt.Errorf("block has height zero")
+	}
+
+	if block.Height != 1 && block.PreviousBlockHash == "" {
+		return fmt.Errorf("block has height zero")
+	}
+	return nil
+}
+
+func (block *Block) Encode() ([]byte, error) {
+	if err := block.Verify(); err != nil {
+		return nil, err
+	}
+
+	hash := block.Hash()	
+	var buf bytes.Buffer
+
+	if len(hash) != BLOCK_HASH_STR_LENGTH {
+		return nil, fmt.Errorf("block has invalid hash: %v", hash)
+	}
+
+	buf.WriteString(hash)
+	buf.Write(util.EncodeUint64(uint64(block.Timestamp)))
+	
+	if len(block.PreviousBlockHash) != BLOCK_HASH_STR_LENGTH  {
+		return nil, fmt.Errorf("block has invalid hash: %v", hash)
+	}
+
+	buf.WriteString(block.PreviousBlockHash)
+
+	txCount := len(block.Transactions)
+	EventCount := len(block.Executions)
+
+	// Count Flag
+	buf.Write(util.EncodeUint64(uint64(EventCount)))
+	buf.Write(util.EncodeUint64(uint64(txCount)))
+	
+	for _, event := range(block.Executions) {
+		eventBuffer, err := event.Encode()
+		eventBufferSize := len(eventBuffer)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(util.EncodeUint64(uint64(eventBufferSize)))
+		buf.Write(eventBuffer)
+	}
+
+	for _, tx := range(block.Transactions) {
+		txBuffer, err := tx.Encode()
+		txBufferSize := len(txBuffer)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(util.EncodeUint64(uint64(txBufferSize)))
+		buf.Write(txBuffer)
+	}
+	return buf.Bytes(), nil
 }
 

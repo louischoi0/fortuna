@@ -3,6 +3,7 @@ package service
 import (
 	"fortuna/core/model"
 	"fortuna/swift"
+	"fortuna/storage"
 	"sync"
 )
 
@@ -10,13 +11,11 @@ const EVENT_BUFFER_SIZE = 1024
 const TRANSACTION_BUFFER_SIZE = 1024
 
 type Oracle struct {
-	mu sync.Mutex
+	mu 			sync.Mutex
+	storage 		*storage.ChainStorage
 
-	// stateDB 		  *grocksdb.DB
-	//ChainStorage		  *
-
-	Chain			   *model.Chain
-	CurrentBlock               *model.Block
+	Chain			*model.Chain
+	CurrentBlock            *model.Block
 
 	eventBuffer 		chan *model.Event
 	transactionBuffer 	chan *model.Transaction

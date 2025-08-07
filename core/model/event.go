@@ -474,6 +474,29 @@ func NewEventExecutionResultFromEvent(event *Event, result string) *EventExecuti
 	}
 }
 
+func (xr *EventExecutionResult) Encode() ([]byte, error) {
+	if xr.Event == nil {
+		return nil, fmt.Errorf("execution has no event")
+	}
+
+	var buf bytes.Buffer
+
+	buf.WriteString(xr.Hash())
+
+	eventBuffer, err := xr.Event.Encode()
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(eventBuffer)
+
+	resultSize := uint64(len(xr.Result))
+
+	buf.Write(util.EncodeUint64(resultSize))
+	buf.Write([]byte(xr.Result))
+
+	return buf.Bytes(), nil
+}
+
 func (xr *EventExecutionResult) Verify(hash string) bool {
 	return xr.Hash() == hash
 }
