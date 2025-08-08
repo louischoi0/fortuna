@@ -2,9 +2,9 @@ package test
 
 import (
 	"encoding/json"
+	"fmt"
 	. "fortuna/core/model"
 	"testing"
-	"fmt"
 )
 
 func TestParseCompactOperation(t *testing.T) {
@@ -12,17 +12,17 @@ func TestParseCompactOperation(t *testing.T) {
 	buf := vector.Encode()
 
 	tests := []struct {
-		input    	string
-		wantCode 	string
-		wantErr  	bool
+		input    string
+		wantCode string
+		wantErr  bool
 	}{
-		{`*x00$"hello"$%`+string(buf)+"%;", "x00", false},
+		{`*x00$"hello"$%` + string(buf) + "%;", "x00", false},
 	}
 
 	for _, tt := range tests {
 		fmt.Println(tt.input)
 
-		op, err := ParseCompactOperation(tt.input)
+		op, err := ParseCompactOperation([]byte(tt.input))
 		if (err != nil) != tt.wantErr {
 			t.Errorf("ParseCompactOperation(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 			continue
@@ -36,4 +36,3 @@ func TestParseCompactOperation(t *testing.T) {
 		}
 	}
 }
-

@@ -261,8 +261,8 @@ func buildIntermediate(nl []*Node, t *MerkleTree) (*Node, error) {
 }
 
 // MerkleRoot returns the unverified Merkle Root (hash of the root node) of the tree.
-func (m *MerkleTree) MerkleRoot() []byte {
-	return m.merkleRoot
+func (m *MerkleTree) MerkleRoot() string {
+	return fmt.Sprintf("%x", m.merkleRoot)
 }
 
 // RebuildTree is a helper function that will rebuild the tree reusing only the content that

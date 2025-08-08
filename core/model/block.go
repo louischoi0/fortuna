@@ -35,16 +35,21 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 	var phash string
 	if prevBlock != nil {
 		phash = prevBlock.Hash()
+	} else {
+		phash = strings.Repeat("0", BLOCK_HASH_STR_LENGTH)
 	}
 
 	return &Block{
-		SpaceID:           spaceID,
-		Height:            height,
-		Count:             0,
-		PreviousBlock:     prevBlock,
-		PreviousBlockHash: phash,
-		Executions:        make([]*EventExecutionResult, 0, 50),
-		Transactions:      make([]*Transaction, 0, 30),
+		SpaceID:             spaceID,
+		Height:              height,
+		Count:               0,
+		PreviousBlock:       prevBlock,
+		PreviousBlockHash:   phash,
+		Executions:          make([]*EventExecutionResult, 0, 50),
+		Transactions:        make([]*Transaction, 0, 30),
+		TransactionRootHash: strings.Repeat("0", BLOCK_HASH_STR_LENGTH),
+		ExecutionRootHash:   strings.Repeat("0", BLOCK_HASH_STR_LENGTH),
+		UniverseHash:        strings.Repeat("0", BLOCK_HASH_STR_LENGTH),
 	}
 }
 
@@ -72,13 +77,18 @@ func (block *Block) Hash() string {
 	buf.WriteString(block.ExecutionRootHash)
 	buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(block.TransactionRootHash)
-	buf.WriteString(HASH_SEPERATOR)
-	buf.WriteString(block.UniverseHash)
+	// buf.WriteString(HASH_SEPERATOR)
+	// buf.WriteString(block.UniverseHash)
 
 	return crypto.SHA256(buf.String())
 }
 
 func (block *Block) UpdateTransactionRoot() {
+	if len(block.Transactions) == 0 {
+		block.TransactionRootHash = strings.Repeat("0", BLOCK_HASH_STR_LENGTH)
+		return
+	}
+
 	contents := make([]structure.Content, len(block.Transactions))
 	for i, er := range block.Transactions {
 		contents[i] = er
@@ -91,6 +101,11 @@ func (block *Block) UpdateTransactionRoot() {
 }
 
 func (block *Block) UpdateExecutionRoot() {
+	if len(block.Executions) == 0 {
+		block.ExecutionRootHash = strings.Repeat("0", BLOCK_HASH_STR_LENGTH)
+		return
+	}
+
 	contents := make([]structure.Content, len(block.Executions))
 	for i, er := range block.Executions {
 		contents[i] = er
@@ -123,25 +138,27 @@ func (block *Block) Encode() ([]byte, error) {
 	}
 
 	hash := block.Hash()
-	var buf bytes.Buffer
 
 	if len(hash) != BLOCK_HASH_STR_LENGTH {
 		return nil, fmt.Errorf("block has invalid hash: %v", hash)
 	}
 
-	buf.WriteString(hash)
-	buf.Write(util.EncodeUint64(uint64(block.Timestamp)))
-
 	if block.Height > 1 && len(block.PreviousBlockHash) != BLOCK_HASH_STR_LENGTH {
 		return nil, fmt.Errorf("block has invalid previous block hash: %v", hash)
 	}
 
+	var buf bytes.Buffer
+	buf.WriteString(hash)
+	buf.Write(util.EncodeUint64(uint64(block.Height)))
+	buf.Write(util.EncodeUint64(uint64(block.Timestamp)))
+
 	buf.WriteString(block.PreviousBlockHash)
+	// buf.WriteString(block.TransactionRootHash)
+	// buf.WriteString(block.ExecutionRootHash)
 
 	txCount := len(block.Transactions)
 	EventCount := len(block.Executions)
 
-	// Count Flag
 	buf.Write(util.EncodeUint64(uint64(EventCount)))
 	buf.Write(util.EncodeUint64(uint64(txCount)))
 
@@ -203,6 +220,11 @@ func DecodeBlock(b []byte) (*Block, error) {
 	_, err := readFixedString(BLOCK_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read block hash: %w", err)
+	}
+
+	height, err := readU64LE()
+	if err != nil {
+		return nil, fmt.Errorf("read height: %w", err)
 	}
 
 	// 2. timestamp
@@ -272,6 +294,7 @@ func DecodeBlock(b []byte) (*Block, error) {
 
 	// 7. construct block
 	block := &Block{
+		Height:            int64(height),
 		Timestamp:         int64(ts),
 		PreviousBlockHash: prevHash,
 		Executions:        events,

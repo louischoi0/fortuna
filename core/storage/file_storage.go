@@ -1,28 +1,29 @@
 package storage
 
 import (
-	"sync"
+	"os"
 	"path/filepath"
+	"sync"
 )
 
 type FileStorage struct {
-	mu		sync.Mutex
-	Directory	string
-	Files		map[string]*File
+	mu        sync.Mutex
+	Directory string
+	Files     map[string]*File
 }
 
 func NewFileStorage(dir string) *FileStorage {
 	return &FileStorage{
 		Directory: dir,
-		Files: make(map[string]*File),
+		Files:     make(map[string]*File),
 	}
 }
 
 type File struct {
-	mu		sync.Mutex
-	Storage		*FileStorage
-	Name		string
-	Path		string
+	mu      sync.Mutex
+	Storage *FileStorage
+	Name    string
+	Path    string
 }
 
 func DataRootDir() string {
@@ -32,7 +33,7 @@ func DataRootDir() string {
 func NewFile(storage *FileStorage, name string) *File {
 	return &File{
 		Storage: storage,
-		Path:	filepath.Join(DataRootDir(), storage.Directory, name),
+		Path:    filepath.Join(DataRootDir(), storage.Directory, name),
 	}
 }
 
@@ -50,13 +51,13 @@ func (file *File) AppendFileBytes(data []byte) error {
 }
 
 func (storage *FileStorage) ListFiles(recursive bool) []string {
-	info, err := os.Stat(storage.Dirname)
+	info, err := os.Stat(storage.Directory)
 	if err != nil || !info.IsDir() {
 		return []string{}
 	}
 
 	items := []string{}
-	contents, err := filepath.Glob(filepath.Join(storage.Dirname, "*"))
+	contents, err := filepath.Glob(filepath.Join(storage.Directory, "*"))
 	if err != nil {
 		return []string{}
 	}
@@ -68,7 +69,7 @@ func (storage *FileStorage) ListFiles(recursive bool) []string {
 		}
 
 		if info.IsDir() && recursive {
-			items = append(items, ListFiles(item, recursive)...)
+			items = append(items, storage.ListFiles(recursive)...)
 		} else if !info.IsDir() {
 			items = append(items, item)
 		}
