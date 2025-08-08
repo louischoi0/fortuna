@@ -47,7 +47,7 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 		PreviousBlock:       prevBlock,
 		PreviousBlockHash:   phash,
 		Executions:          make([]*EventExecutionResult, 0, 50),
-		Transactions:        make([]*Transaction, 0, 30),
+		Transactions:        make([]*Transaction, 0, 25),
 		TransactionRootHash: ZERO_HASH,
 		ExecutionRootHash:   ZERO_HASH,
 		UniverseHash:        ZERO_HASH,
