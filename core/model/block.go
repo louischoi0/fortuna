@@ -11,6 +11,7 @@ import (
 )
 
 const BLOCK_HASH_STR_LENGTH = 64
+const ZERO_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
 
 type Block struct {
 	mu sync.Mutex
@@ -36,7 +37,7 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 	if prevBlock != nil {
 		phash = prevBlock.Hash()
 	} else {
-		phash = strings.Repeat("0", BLOCK_HASH_STR_LENGTH)
+		phash = ZERO_HASH
 	}
 
 	return &Block{
@@ -47,9 +48,9 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 		PreviousBlockHash:   phash,
 		Executions:          make([]*EventExecutionResult, 0, 50),
 		Transactions:        make([]*Transaction, 0, 30),
-		TransactionRootHash: strings.Repeat("0", BLOCK_HASH_STR_LENGTH),
-		ExecutionRootHash:   strings.Repeat("0", BLOCK_HASH_STR_LENGTH),
-		UniverseHash:        strings.Repeat("0", BLOCK_HASH_STR_LENGTH),
+		TransactionRootHash: ZERO_HASH,
+		ExecutionRootHash:   ZERO_HASH,
+		UniverseHash:        ZERO_HASH,
 	}
 }
 
@@ -85,7 +86,7 @@ func (block *Block) Hash() string {
 
 func (block *Block) UpdateTransactionRoot() {
 	if len(block.Transactions) == 0 {
-		block.TransactionRootHash = strings.Repeat("0", BLOCK_HASH_STR_LENGTH)
+		block.TransactionRootHash = ZERO_HASH
 		return
 	}
 
@@ -102,7 +103,7 @@ func (block *Block) UpdateTransactionRoot() {
 
 func (block *Block) UpdateExecutionRoot() {
 	if len(block.Executions) == 0 {
-		block.ExecutionRootHash = strings.Repeat("0", BLOCK_HASH_STR_LENGTH)
+		block.ExecutionRootHash = ZERO_HASH
 		return
 	}
 
@@ -292,7 +293,6 @@ func DecodeBlock(b []byte) (*Block, error) {
 		txs = append(txs, tx)
 	}
 
-	// 7. construct block
 	block := &Block{
 		Height:            int64(height),
 		Timestamp:         int64(ts),
@@ -301,7 +301,6 @@ func DecodeBlock(b []byte) (*Block, error) {
 		Transactions:      txs,
 	}
 
-	// optional: update tree root hashes
 	block.UpdateExecutionRoot()
 	block.UpdateTransactionRoot()
 
