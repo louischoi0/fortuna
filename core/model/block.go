@@ -103,7 +103,7 @@ func (block *Block) UpdateExecutionRoot() {
 }
 
 func (block *Block) Verify() error {
-	if !(len(block.Transactions) == 0 && len(block.Executions) == 0) {
+	if len(block.Transactions) == 0 && len(block.Executions) == 0 {
 		return fmt.Errorf("block has no transaction and event")
 	}
 
@@ -132,8 +132,8 @@ func (block *Block) Encode() ([]byte, error) {
 	buf.WriteString(hash)
 	buf.Write(util.EncodeUint64(uint64(block.Timestamp)))
 
-	if len(block.PreviousBlockHash) != BLOCK_HASH_STR_LENGTH {
-		return nil, fmt.Errorf("block has invalid hash: %v", hash)
+	if block.Height > 1 && len(block.PreviousBlockHash) != BLOCK_HASH_STR_LENGTH {
+		return nil, fmt.Errorf("block has invalid previous block hash: %v", hash)
 	}
 
 	buf.WriteString(block.PreviousBlockHash)

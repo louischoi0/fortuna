@@ -604,19 +604,18 @@ func DecodeEventExecutionResult(b []byte) (*EventExecutionResult, error) {
 	resultBytes := b[off : off+int(resultSize)]
 	result := string(resultBytes)
 
+	event_hash := event.Hash()
+
 	// 4. Compose object
 	exec := &EventExecutionResult{
 		Event:     event,
-		EventHash: hash,
+		EventHash: event_hash,
 		Result:    result,
 		Err:       nil, // not included in current encoding
 	}
 
-	fmt.Println("gotevent")
-	fmt.Println(event)
-	// 5. Verify hash
-	if got := event.Hash(); got != exec.EventHash {
-		return nil, fmt.Errorf("hash mismatch: expected %s, got %s", hash, got)
+	if hash != exec.Hash() {
+		return nil, fmt.Errorf("event result hash mismatched expected: %s, got: %s", hash, exec.Hash())
 	}
 
 	return exec, nil

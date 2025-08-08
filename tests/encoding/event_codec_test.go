@@ -64,9 +64,6 @@ func TestEventExecutionResult(t *testing.T) {
 			t.Fatalf("failed to parse event: %v", err)
 		}
 
-		fmt.Println("hash::")
-		fmt.Println(event.Hash())
-
 		exec := model.NewEventExecutionResultFromEvent(event, "success")
 
 		encoded, err := exec.Encode()
