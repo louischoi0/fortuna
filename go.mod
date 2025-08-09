@@ -3,7 +3,7 @@ module fortuna
 go 1.24.2
 
 require (
-	github.com/linxGnu/grocksdb v1.10.1
+	github.com/linxGnu/grocksdb v1.9.8
 	github.com/spf13/cobra v1.9.1
 )
 

@@ -4,6 +4,7 @@ import (
 	"fortuna/core/model"
 	"fortuna/core/storage"
 	"fortuna/swift"
+	"fortuna/rock"
 	"sync"
 )
 
@@ -11,16 +12,19 @@ const EVENT_BUFFER_SIZE = 1024
 const TRANSACTION_BUFFER_SIZE = 1024
 
 type Oracle struct {
-	mu      sync.Mutex
-	storage *storage.FileStorage
+	mu      		sync.Mutex
 
-	Chain        *model.Chain
-	CurrentBlock *model.Block
+	storage 		*storage.FileStorage
+	meta			*grocksdb.DB
+	height			int64
 
-	eventBuffer       chan *model.Event
-	transactionBuffer chan *model.Transaction
+	Chain        		*model.Chain
+	CurrentBlock 		*model.Block
 
-	swift *swift.TCPServer
+	eventBuffer       	chan *model.Event
+	transactionBuffer 	chan *model.Transaction
+
+	swift 			*swift.TCPServer
 }
 
 type OracleConfig struct {
@@ -30,16 +34,36 @@ type OracleConfig struct {
 }
 
 func NewOracle(config OracleConfig) *Oracle {
-	/**
-	stateDB, err := rock.GetDBInstance("status.rocks")
+	metaDB, err := rock.GetDBInstance("meta.rocks")
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
-	**/
+
 	return &Oracle{
 		eventBuffer:       make(chan *model.Event, EVENT_BUFFER_SIZE),
 		transactionBuffer: make(chan *model.Transaction, TRANSACTION_BUFFER_SIZE),
 	}
+}
+
+func (o *Oracle) CommitCurentBlock() error {
+	if c.CurrentBlock == nil {
+		return fmt.Errorf("current block is not set (nil)")
+	}
+
+	current_block_buffer, err := c.CurrentBlock.Encode()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *Oracle) SetHeight(height int64) error {
+	err = rock.SetValue(sf.db, key, data)
+	if err != nil {
+		return err
+	}
+	o.height = height
 }
 
 func (c *Oracle) Bootstrap() error {
