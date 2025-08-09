@@ -18,8 +18,8 @@ const (
 	FIC__001 InterfaceID = "FIC-00-001"
 )
 
-func NewErrorEventExecutionResultRequiredParameter(event *model.Event, keyName string) *model.EventExecutionResult {
-	return &model.EventExecutionResult{
+func NewErrorEventResultRequiredParameter(event *model.Event, keyName string) *model.EventResult {
+	return &model.EventResult{
 		Err: &model.EventExecutionError{
 			Code:    1,
 			Message: fmt.Sprintf("parameter %v required", keyName),
@@ -27,8 +27,8 @@ func NewErrorEventExecutionResultRequiredParameter(event *model.Event, keyName s
 	}
 }
 
-func NewErrorEventExecutionResultUnknownInterfaceID(event *model.Event) *model.EventExecutionResult {
-	return &model.EventExecutionResult{
+func NewErrorEventResultUnknownInterfaceID(event *model.Event) *model.EventResult {
+	return &model.EventResult{
 		Err: &model.EventExecutionError{
 			Code:    1,
 			Message: "Unknown Interface ID",
@@ -36,26 +36,26 @@ func NewErrorEventExecutionResultUnknownInterfaceID(event *model.Event) *model.E
 	}
 }
 
-func EXEC_INTERFACE(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventExecutionResult {
+func EXEC_INTERFACE(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventResult {
 	switch InterfaceID(event.Spec.InterfaceID) {
 	case FIC__001:
 		return EVENT__001(machine, event, kernel)
 	default:
-		return NewErrorEventExecutionResultUnknownInterfaceID(event)
+		return NewErrorEventResultUnknownInterfaceID(event)
 	}
 
 }
 
-func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventExecutionResult {
+func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventResult {
 	seed := event.Hash()
 	slot_count, ok := event.Spec.Params.Int64("slot_count")
 
 	if !ok {
-		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count")
+		return NewErrorEventResultRequiredParameter(event, "slot_count")
 	}
 
 	if int(slot_count) >= machine.State.Size() {
-		return NewErrorEventExecutionResultRequiredParameter(event, "slot_count is bigger than legth of machine state")
+		return NewErrorEventResultRequiredParameter(event, "slot_count is bigger than legth of machine state")
 	}
 
 	indices := kernel.GenIndex(seed, 0, slot_count, 2)
@@ -71,6 +71,6 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 		result = "f"
 	}
 
-	executionResult := model.NewEventExecutionResultFromEvent(event, result)
+	executionResult := model.NewEventResultFromEvent(event, result)
 	return executionResult
 }

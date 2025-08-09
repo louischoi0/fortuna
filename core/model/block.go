@@ -28,7 +28,7 @@ type Block struct {
 	TransactionRootHash string
 	UniverseHash        string
 
-	Executions   []*EventExecutionResult
+	Executions   []*EventResult
 	Transactions []*Transaction
 }
 
@@ -46,7 +46,7 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 		Count:               0,
 		PreviousBlock:       prevBlock,
 		PreviousBlockHash:   phash,
-		Executions:          make([]*EventExecutionResult, 0, 50),
+		Executions:          make([]*EventResult, 0, 50),
 		Transactions:        make([]*Transaction, 0, 25),
 		TransactionRootHash: ZERO_HASH,
 		ExecutionRootHash:   ZERO_HASH,
@@ -61,7 +61,7 @@ func (block *Block) AppendTransactionExecution(tx *Transaction) {
 	block.Transactions = append(block.Transactions, tx)
 }
 
-func (block *Block) AppendEventExecution(er *EventExecutionResult) {
+func (block *Block) AppendEventExecution(er *EventResult) {
 	block.mu.Lock()
 	defer block.mu.Unlock()
 
@@ -254,7 +254,7 @@ func DecodeBlock(b []byte) (*Block, error) {
 	txCount := int(txCountU)
 
 	// 5. decode event executions
-	var events []*EventExecutionResult
+	var events []*EventResult
 	for i := 0; i < eventCount; i++ {
 		sizeU, err := readU64LE()
 		if err != nil {
@@ -266,7 +266,7 @@ func DecodeBlock(b []byte) (*Block, error) {
 		data := b[off : off+int(sizeU)]
 		off += int(sizeU)
 
-		evt, err := DecodeEventExecutionResult(data)
+		evt, err := DecodeEventResult(data)
 		if err != nil {
 			return nil, fmt.Errorf("decode event: %w", err)
 		}

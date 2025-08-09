@@ -22,7 +22,7 @@ func TestBlockCodec(t *testing.T) {
 			t.Fatalf("failed to parse ordered map: %v", err)
 		}
 
-		exec := model.NewEventExecutionResultFromEvent(event, "success")
+		exec := model.NewEventResultFromEvent(event, "success")
 		block := model.NewBlock("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 1, nil)
 		block.AppendEventExecution(exec)
 		block.Timestamp = int64(timestamp)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"fortuna/core/model"
 	"fortuna/core/vm"
-	"fortuna/swift"
 	"log"
 	"os"
 	"os/signal"
@@ -22,8 +21,7 @@ type Synapse struct {
 	machines map[vm.KernelVersion]*vm.StateMachine
 	Universe *vm.Universe
 
-	confirms []*model.EventExecutionResult
-	swift    *swift.TCPServer
+	confirms []*model.EventResult
 }
 
 func NewSynapse(spaceID string) *Synapse {
@@ -34,8 +32,7 @@ func NewSynapse(spaceID string) *Synapse {
 		Universe: universe,
 		Epoch:    0,
 		machines: make(map[vm.KernelVersion]*vm.StateMachine),
-		confirms: make([]*model.EventExecutionResult, 0, 100),
-		swift:    swift.NewServer(),
+		confirms: make([]*model.EventResult, 0, 100),
 	}
 }
 
@@ -58,7 +55,7 @@ func (n *Synapse) LoadMachine(kernel vm.KernelVersion) (*vm.StateMachine, error)
 	return machine, nil
 }
 
-func (n *Synapse) Confirm(request *model.Event) (*model.EventExecutionResult, error) {
+func (n *Synapse) Confirm(request *model.Event) (*model.EventResult, error) {
 	machine, err := n.LoadMachine(vm.KernelVersion(request.Spec.KernelVersion))
 
 	if err != nil {
@@ -78,7 +75,7 @@ func (n *Synapse) Confirm(request *model.Event) (*model.EventExecutionResult, er
 	return er, nil
 }
 
-func (n *Synapse) Commit(eventresult *model.EventExecutionResult) error {
+func (n *Synapse) Commit(eventresult *model.EventResult) error {
 	return nil
 }
 
@@ -93,10 +90,6 @@ func (n *Synapse) Init() {
 func (n *Synapse) Run(port int) error {
 	if err := n.InitMachines(); err != nil {
 		log.Fatalf("Failed to init synapse: %v", err.Error())
-	}
-
-	if err := n.swift.Start(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err.Error())
 	}
 
 	sigChan := make(chan os.Signal, 1)

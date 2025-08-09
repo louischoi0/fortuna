@@ -447,23 +447,23 @@ func (er *EventExecutionError) Map() *structure.OrderedMap {
 	return om
 }
 
-type EventExecutionResult struct {
+type EventResult struct {
 	Event     *Event               `json:"event"`
 	EventHash string               `json:"event_hash"`
 	Result    string               `json:"result"`
 	Err       *EventExecutionError `json:"error"`
 }
 
-func (xr *EventExecutionResult) Buffer() []byte {
+func (xr *EventResult) Buffer() []byte {
 	return []byte(xr.String())
 }
 
-func (xr *EventExecutionResult) String() string {
+func (xr *EventResult) String() string {
 	om := xr.Map()
 	return om.Ser()
 }
 
-func (xr *EventExecutionResult) Hash() string {
+func (xr *EventResult) Hash() string {
 	if xr.Event == nil {
 		return ""
 	}
@@ -476,8 +476,8 @@ func (xr *EventExecutionResult) Hash() string {
 	return crypto.SHA256(buffer.String())
 }
 
-func NewEventExecutionResultFromEvent(event *Event, result string) *EventExecutionResult {
-	return &EventExecutionResult{
+func NewEventResultFromEvent(event *Event, result string) *EventResult {
+	return &EventResult{
 		Event:     event,
 		Result:    result,
 		EventHash: event.Hash(),
@@ -485,7 +485,7 @@ func NewEventExecutionResultFromEvent(event *Event, result string) *EventExecuti
 	}
 }
 
-func (xr *EventExecutionResult) Encode() ([]byte, error) {
+func (xr *EventResult) Encode() ([]byte, error) {
 	if xr.Event == nil {
 		return nil, fmt.Errorf("execution has no event")
 	}
@@ -511,11 +511,11 @@ func (xr *EventExecutionResult) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (xr *EventExecutionResult) Verify(hash string) bool {
+func (xr *EventResult) Verify(hash string) bool {
 	return xr.Hash() == hash
 }
 
-func (xr *EventExecutionResult) Map() *structure.OrderedMap {
+func (xr *EventResult) Map() *structure.OrderedMap {
 	om := structure.NewOrderedMap()
 
 	if xr.Event != nil {
@@ -537,7 +537,7 @@ func (xr *EventExecutionResult) Map() *structure.OrderedMap {
 	return om
 }
 
-func DecodeEventExecutionResult(b []byte) (*EventExecutionResult, error) {
+func DecodeEventResult(b []byte) (*EventResult, error) {
 	var (
 		off = 0
 		n   = len(b)
@@ -607,7 +607,7 @@ func DecodeEventExecutionResult(b []byte) (*EventExecutionResult, error) {
 	event_hash := event.Hash()
 
 	// 4. Compose object
-	exec := &EventExecutionResult{
+	exec := &EventResult{
 		Event:     event,
 		EventHash: event_hash,
 		Result:    result,

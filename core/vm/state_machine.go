@@ -43,7 +43,7 @@ func NewBasicStateMachine(universe *Universe, SpaceID string, stateCount int64) 
 	return machine
 }
 
-func (machine *StateMachine) EmitEventResult(event *model.Event) (*model.EventExecutionResult, error) {
+func (machine *StateMachine) EmitEventResult(event *model.Event) (*model.EventResult, error) {
 	er := EXEC_INTERFACE(machine, event, machine.StateKernel)
 	return er, nil
 }

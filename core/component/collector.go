@@ -51,6 +51,6 @@ func (c *Collector) CommitBlock() error {
 	return nil
 }
 
-func (c *Collector) VerifyEventExecution(event *model.EventExecutionResult) error {
+func (c *Collector) VerifyEventExecution(event *model.EventResult) error {
 	return nil
 }

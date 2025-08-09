@@ -17,17 +17,17 @@ const (
 	PacketTypePong          PacketType = 2
 	PacketTypeErrorResponse PacketType = 9
 
-	PacketTypeEmitEventRequest  PacketType = 10
-	PacketTypeEmitEventResponse PacketType = 11
+	PacketTypeEmitEventRequest  PacketType = 11
+	PacketTypeEmitEventResponse PacketType = 12
 
-	PacketTypeStateSeedAPIRequest  PacketType = 12
-	PacketTypeStateSeedAPIResponse PacketType = 13
+	PacketTypeStateSeedAPIRequest  PacketType = 13
+	PacketTypeStateSeedAPIResponse PacketType = 14
 
-	PacketTypeGenVectorRequest  PacketType = 14
-	PacketTypeGenVectorResponse PacketType = 15
+	PacketTypeGenVectorRequest  PacketType = 15
+	PacketTypeGenVectorResponse PacketType = 16
 
-	PacketTypeVerifyVectorRequest  PacketType = 16
-	PacketTypeVerifyVectorResponse PacketType = 17
+	PacketTypeVerifyEventResultRequest  PacketType = 17
+	PacketTypeVerifyEventResultResponse PacketType = 18
 )
 
 type Packet struct {

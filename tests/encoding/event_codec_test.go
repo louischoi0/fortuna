@@ -64,16 +64,16 @@ func TestEventExecutionResult(t *testing.T) {
 			t.Fatalf("failed to parse event: %v", err)
 		}
 
-		exec := model.NewEventExecutionResultFromEvent(event, "success")
+		exec := model.NewEventResultFromEvent(event, "success")
 
 		encoded, err := exec.Encode()
 		if err != nil {
 			t.Fatalf("Encode failed: %v", err)
 		}
 
-		decoded, err := model.DecodeEventExecutionResult(encoded)
+		decoded, err := model.DecodeEventResult(encoded)
 		if err != nil {
-			t.Fatalf("DecodeEventExecutionResult failed: %v", err)
+			t.Fatalf("DecodeEventResult failed: %v", err)
 		}
 
 		if decoded.Event == nil {
