@@ -51,7 +51,7 @@ func TestEncodeDecodeEvent(t *testing.T) {
 
 func TestEventExecutionResult(t *testing.T) {
 	t.Run("encode/decode execution result with event", func(t *testing.T) {
-		// GIVEN: an event with basic info
+
 		timestamp := 1754354451836053510
 		ebuf := fmt.Sprintf(`{"timestamp": %v, "space_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","publisher": "0000000000000000000000000000000000000000000000000000000000000000","payload":{"a":3},"spec":{"interface_id":"FIC-00-00001","version":"base::v0.0.0","params":{"slot_count":64}},"topic":"","subtopic":"","seperator":"","tag":""}`, timestamp)
 		om, err := structure.ParseOrderedMap(ebuf)

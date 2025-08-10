@@ -5,9 +5,6 @@ import (
 	"fortuna/core/model"
 	"fortuna/core/vm"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 const BASIC_NODE_STATE_COUNT = 256
@@ -87,14 +84,10 @@ func (n *Synapse) Init() {
 
 }
 
-func (n *Synapse) Run(port int) error {
+func (n *Synapse) Run() error {
 	if err := n.InitMachines(); err != nil {
 		log.Fatalf("Failed to init synapse: %v", err.Error())
 	}
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	<-sigChan
 	return nil
 }

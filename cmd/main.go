@@ -19,11 +19,11 @@ func Execute() {
 
 // Execute sets up the CLI entry point
 func init() {
-	nodeCMD := CreateNodeCMD()
+	oracleCMD := CreateOracleCMD()
 	eventCMD := CreateEventCMD()
 	apiCMD := CreateAPICMD()
 
-	rootCmd.AddCommand(nodeCMD)
+	rootCmd.AddCommand(oracleCMD)
 	rootCmd.AddCommand(eventCMD)
 	rootCmd.AddCommand(apiCMD)
 }

@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/linxGnu/grocksdb"
 )
 
-const DATA_DIR = "data"
+func MetaStoreDataRootDir() string {
+	return "data"
+}
 
 var (
 	dbs      = make(map[string]*grocksdb.DB)
@@ -42,8 +45,9 @@ func GetDBInstance(key string) (*grocksdb.DB, error) {
 	once.Do(func() {
 		opts := grocksdb.NewDefaultOptions()
 		opts.SetCreateIfMissing(true)
-		// path := filepath.Join("data", key)
-		path := filepath.Join(DATA_DIR, key)
+		os.MkdirAll(MetaStoreDataRootDir(), 0755)
+
+		path := filepath.Join(MetaStoreDataRootDir(), key)
 
 		db, initErr = grocksdb.OpenDb(opts, path)
 		if initErr == nil {

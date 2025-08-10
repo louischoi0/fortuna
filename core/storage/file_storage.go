@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -28,7 +29,7 @@ type File struct {
 }
 
 func DataRootDir() string {
-	return ""
+	return "data"
 }
 
 func NewFile(storage *FileStorage, name string) *File {
@@ -104,4 +105,22 @@ func (storage *FileStorage) ListFiles(recursive bool) []string {
 
 func (storage *FileStorage) GetFile(name string) *File {
 	return storage.Files[name]
+}
+
+func (file *File) OffsetRead(offset int64, size int64) ([]byte, error) {
+	file.mu.Lock()
+	defer file.mu.Unlock()
+
+	_, err := file.f.Seek(offset, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seek file: %v", err)
+	}
+
+	buffer := make([]byte, size)
+	n, err := file.f.Read(buffer)
+	if err != nil && err.Error() != "EOF" {
+		return nil, fmt.Errorf("failed to read from file: %v", err)
+	}
+
+	return buffer[:n], nil
 }

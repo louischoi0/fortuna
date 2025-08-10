@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fortuna/rpc"
+	"fortuna/service"
 	"fortuna/swift"
 	"log"
 
@@ -33,20 +34,23 @@ func CreatePingRequestCMD() *cobra.Command {
 	return cmd
 }
 
-func CreateNodeStartCmd() *cobra.Command {
+func CreateOracleStartCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			/**
 			workspace, _ := cmd.Flags().GetString("workspace")
 			port, _ := cmd.Flags().GetInt("port")
 
-			syn := component.NewSynapse(workspace)
-			syn.StartUp()
-			syn.Run(port)
-			*/
+			oracle := service.GetOracleService(workspace, service.OracleConfig{
+				MaxEventRequestsPerMinute: 1000,
+				EventBufferSize:           1000,
+				TransactionBufferSize:     1000,
+			})
+
+			oracle.StartUp()
+			oracle.Run(port)
 
 			return nil
 		},
@@ -57,13 +61,13 @@ func CreateNodeStartCmd() *cobra.Command {
 	return cmd
 }
 
-func CreateNodeCMD() *cobra.Command {
+func CreateOracleCMD() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "node",
-		Short: "node management cli",
+		Use:   "oracle",
+		Short: "oracle management cli",
 	}
 
-	cmd.AddCommand(CreateNodeStartCmd())
+	cmd.AddCommand(CreateOracleStartCmd())
 	cmd.AddCommand(CreatePingRequestCMD())
 
 	return cmd
