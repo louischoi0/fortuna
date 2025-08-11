@@ -3,19 +3,13 @@ package model
 import (
 	"bytes"
 	"fmt"
+	C "fortuna/core/config"
 	"fortuna/crypto"
 	"fortuna/structure"
 	"fortuna/util"
 	"strconv"
 	"strings"
 )
-
-const HASH_SEPERATOR = ":"
-const IDENTITY_ADDRESS_STR_LENGTH = 64
-const MODEL_HASH_STR_LENGTH = 64
-const SPACE_ID_STR_LENGTH = 64
-const INTERFACE_ID_STR_LENGTH = 12
-const KERNEL_VERSION_STR_LENGTH = 12
 
 type Identity struct {
 	Address        string `json:"address"`
@@ -140,7 +134,7 @@ func DecodeEvent(b []byte) (*Event, error) {
 		return u, nil
 	}
 
-	hash, err := readFixedString(MODEL_HASH_STR_LENGTH)
+	hash, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read hash: %w", err)
 	}
@@ -150,20 +144,20 @@ func DecodeEvent(b []byte) (*Event, error) {
 		return nil, fmt.Errorf("read timestamp: %w", err)
 	}
 
-	publisher, err := readFixedString(IDENTITY_ADDRESS_STR_LENGTH)
+	publisher, err := readFixedString(C.IDENTITY_ADDRESS_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read publisher: %w", err)
 	}
 
-	spaceID, err := readFixedString(SPACE_ID_STR_LENGTH)
+	spaceID, err := readFixedString(C.SPACE_ID_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read spaceID: %w", err)
 	}
-	ifaceID, err := readFixedString(INTERFACE_ID_STR_LENGTH)
+	ifaceID, err := readFixedString(C.INTERFACE_ID_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read interfaceID: %w", err)
 	}
-	kernelVer, err := readFixedString(KERNEL_VERSION_STR_LENGTH)
+	kernelVer, err := readFixedString(C.KERNEL_VERSION_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read kernelVersion: %w", err)
 	}
@@ -254,24 +248,24 @@ func (event *Event) Encode() ([]byte, error) {
 	var buf bytes.Buffer
 
 	hash := event.Hash()
-	if len(hash) != MODEL_HASH_STR_LENGTH {
-		return nil, fmt.Errorf("hash must have length: %d", MODEL_HASH_STR_LENGTH)
+	if len(hash) != C.MODEL_HASH_STR_LENGTH {
+		return nil, fmt.Errorf("hash must have length: %d", C.MODEL_HASH_STR_LENGTH)
 	}
 
-	if len(event.SpaceID) != SPACE_ID_STR_LENGTH {
-		return nil, fmt.Errorf("spaceID must have length: %d", SPACE_ID_STR_LENGTH)
+	if len(event.SpaceID) != C.SPACE_ID_STR_LENGTH {
+		return nil, fmt.Errorf("spaceID must have length: %d", C.SPACE_ID_STR_LENGTH)
 	}
 
-	if len(event.Publisher) != IDENTITY_ADDRESS_STR_LENGTH {
-		return nil, fmt.Errorf("publisher must have length: %d", IDENTITY_ADDRESS_STR_LENGTH)
+	if len(event.Publisher) != C.IDENTITY_ADDRESS_STR_LENGTH {
+		return nil, fmt.Errorf("publisher must have length: %d", C.IDENTITY_ADDRESS_STR_LENGTH)
 	}
 
-	if len(event.Spec.InterfaceID) != INTERFACE_ID_STR_LENGTH {
-		return nil, fmt.Errorf("interfaceID must have length: %d", INTERFACE_ID_STR_LENGTH)
+	if len(event.Spec.InterfaceID) != C.INTERFACE_ID_STR_LENGTH {
+		return nil, fmt.Errorf("interfaceID must have length: %d", C.INTERFACE_ID_STR_LENGTH)
 	}
 
-	if len(event.Spec.KernelVersion) != KERNEL_VERSION_STR_LENGTH {
-		return nil, fmt.Errorf("kernelVersion must have length: %d", KERNEL_VERSION_STR_LENGTH)
+	if len(event.Spec.KernelVersion) != C.KERNEL_VERSION_STR_LENGTH {
+		return nil, fmt.Errorf("kernelVersion must have length: %d", C.KERNEL_VERSION_STR_LENGTH)
 	}
 
 	buf.WriteString(hash)
@@ -310,17 +304,17 @@ func (event *Event) Hash() string {
 	var buf strings.Builder
 
 	buf.WriteString(strconv.Itoa(int(event.Timestamp)))
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(event.SpaceID)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(event.Spec.InterfaceID)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(event.Spec.KernelVersion)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(event.Publisher)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(event.Spec.Params.Hash())
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(event.Payload.Hash())
 
 	return crypto.SHA256(buf.String())
@@ -470,7 +464,7 @@ func (xr *EventResult) Hash() string {
 
 	var buffer strings.Builder
 	buffer.WriteString(xr.Event.Hash())
-	buffer.WriteString(HASH_SEPERATOR)
+	buffer.WriteString(C.HASH_SEPERATOR)
 	buffer.WriteString(xr.Result)
 
 	return crypto.SHA256(buffer.String())
@@ -570,7 +564,7 @@ func DecodeEventResult(b []byte) (*EventResult, error) {
 	}
 
 	// 1. Read hash
-	hash, err := readFixedString(MODEL_HASH_STR_LENGTH)
+	hash, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read hash: %w", err)
 	}

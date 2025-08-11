@@ -1,7 +1,7 @@
 package model
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"fortuna/core/storage"
 	"fortuna/rock"
@@ -12,14 +12,12 @@ import (
 	"sync"
 	"time"
 
+	C "fortuna/core/config"
+
 	"github.com/linxGnu/grocksdb"
 )
 
-const BLOCK_FILE_SIZE = 1024 * 1024 * 256
-const BLOCK_FILE_NAME_FORMAT = "blk%06d"
-const BLOCK_INDEX_KEY_FORMAT = "blkidx:%d"
-
-type blockIndex struct {
+type BlockIndex struct {
 	SpaceID string
 	Height  int64
 	FileNo  int64
@@ -27,23 +25,87 @@ type blockIndex struct {
 	Size    int64
 }
 
-func (b *blockIndex) Encode() ([]byte, error) {
-	// TODO
-	return json.Marshal(b)
+func (b *BlockIndex) Encode() ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(b.SpaceID)
+
+	buffer.Write(util.EncodeUint64(uint64(b.Height)))
+	buffer.Write(util.EncodeUint64(uint64(b.FileNo)))
+	buffer.Write(util.EncodeUint64(uint64(b.Offset)))
+	buffer.Write(util.EncodeUint64(uint64(b.Size)))
+
+	return buffer.Bytes(), nil
 }
 
-func DecodeBlockIndex(data []byte) (*blockIndex, error) {
-	//TODO
-	blockIndex := &blockIndex{}
-	err := json.Unmarshal(data, blockIndex)
+func DecodeBlockIndex(data []byte) (*BlockIndex, error) {
+	b := &BlockIndex{}
+
+	var (
+		off = 0
+		n   = len(data)
+	)
+
+	need := func(k int) error {
+		if off+k > n {
+			return fmt.Errorf("buffer underflow: need %d bytes", k)
+		}
+		return nil
+	}
+	readFixedString := func(k int) (string, error) {
+		if err := need(k); err != nil {
+			return "", err
+		}
+		s := string(data[off : off+k])
+		off += k
+		return s, nil
+	}
+	readU64LE := func() (uint64, error) {
+		if err := need(8); err != nil {
+			return 0, err
+		}
+		v, err := util.DecodeUint64(data[off : off+8])
+		if err != nil {
+			return 0, err
+		}
+		off += 8
+		return v, nil
+	}
+
+	spaceID, err := readFixedString(64)
 	if err != nil {
 		return nil, err
 	}
-	return blockIndex, nil
+	b.SpaceID = spaceID
+
+	height, err := readU64LE()
+	if err != nil {
+		return nil, err
+	}
+	b.Height = int64(height)
+
+	fileNo, err := readU64LE()
+	if err != nil {
+		return nil, err
+	}
+	b.FileNo = int64(fileNo)
+
+	offset, err := readU64LE()
+	if err != nil {
+		return nil, err
+	}
+	b.Offset = int64(offset)
+
+	size, err := readU64LE()
+	if err != nil {
+		return nil, err
+	}
+	b.Size = int64(size)
+
+	return b, nil
 }
 
-func NewBlockIndex(spaceID string, height int64, fileNo int64, offset int64, size int64) *blockIndex {
-	return &blockIndex{
+func NewBlockIndex(spaceID string, height int64, fileNo int64, offset int64, size int64) *BlockIndex {
+	return &BlockIndex{
 		SpaceID: spaceID,
 		Height:  height,
 		FileNo:  fileNo,
@@ -95,7 +157,7 @@ func (c *Chain) LoadChainData() error {
 }
 
 func GetFileName(fileNo int64) string {
-	return fmt.Sprintf(BLOCK_FILE_NAME_FORMAT, fileNo)
+	return fmt.Sprintf(C.BLOCK_FILE_NAME_FORMAT, fileNo)
 }
 
 func (c *Chain) NewNextBlockFile() error {
@@ -112,7 +174,7 @@ func (c *Chain) NewNextBlockFile() error {
 }
 
 func (c *Chain) IsFileSizeExceed(f *storage.File) bool {
-	return f.GetSize() >= BLOCK_FILE_SIZE
+	return f.GetSize() >= C.BLOCK_FILE_SIZE
 }
 
 func (c *Chain) CommitBlock(block *Block) error {
@@ -168,9 +230,9 @@ func (c *Chain) CommitBlock(block *Block) error {
 }
 
 func (c *Chain) GetBlock(height int64) (*Block, error) {
-	blockIndex := c.GetBlockIndex(height)
-	if blockIndex == nil {
-		return nil, fmt.Errorf("block index not found")
+	blockIndex, err := c.GetBlockIndex(height)
+	if err != nil {
+		return nil, err
 	}
 
 	fileName := GetFileName(blockIndex.FileNo)
@@ -192,24 +254,23 @@ func (c *Chain) GetBlock(height int64) (*Block, error) {
 	return block, nil
 }
 
-func (c *Chain) GetBlockIndex(height int64) *blockIndex {
-	key := fmt.Sprintf(BLOCK_INDEX_KEY_FORMAT, height)
+func (c *Chain) GetBlockIndex(height int64) (*BlockIndex, error) {
+	key := fmt.Sprintf(C.BLOCK_INDEX_KEY_FORMAT, height)
 	value, err := rock.GetValue(c.meta, key)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	fmt.Println(string(value.([]byte)))
 	blockIndex, err := DecodeBlockIndex(value.([]byte))
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	return blockIndex
+	return blockIndex, nil
 }
 
-func (c *Chain) WriteBlockIndex(blockIndex *blockIndex) error {
-	key := fmt.Sprintf(BLOCK_INDEX_KEY_FORMAT, blockIndex.Height)
+func (c *Chain) WriteBlockIndex(blockIndex *BlockIndex) error {
+	key := fmt.Sprintf(C.BLOCK_INDEX_KEY_FORMAT, blockIndex.Height)
 	blockIndexBytes, err := blockIndex.Encode()
 	if err != nil {
 		return err

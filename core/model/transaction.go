@@ -7,6 +7,8 @@ import (
 	"fortuna/util"
 	"strconv"
 	"strings"
+
+	C "fortuna/core/config"
 )
 
 type Transaction = RawTransaction
@@ -30,16 +32,16 @@ func NewRawTransaction(spaceID string, from string) *RawTransaction {
 }
 
 func (tx *RawTransaction) Verify(hash string) error {
-	if len(hash) != MODEL_HASH_STR_LENGTH {
-		return fmt.Errorf("hash must have length %d", MODEL_HASH_STR_LENGTH)
+	if len(hash) != C.MODEL_HASH_STR_LENGTH {
+		return fmt.Errorf("hash must have length %d", C.MODEL_HASH_STR_LENGTH)
 	}
 
-	if len(tx.SpaceID) != SPACE_ID_STR_LENGTH {
-		return fmt.Errorf("spaceID must have length %d", SPACE_ID_STR_LENGTH)
+	if len(tx.SpaceID) != C.SPACE_ID_STR_LENGTH {
+		return fmt.Errorf("spaceID must have length %d", C.SPACE_ID_STR_LENGTH)
 	}
 
-	if len(tx.From) != IDENTITY_ADDRESS_STR_LENGTH {
-		return fmt.Errorf("from must have length %d", IDENTITY_ADDRESS_STR_LENGTH)
+	if len(tx.From) != C.IDENTITY_ADDRESS_STR_LENGTH {
+		return fmt.Errorf("from must have length %d", C.IDENTITY_ADDRESS_STR_LENGTH)
 	}
 
 	if len(tx.RawCode) == 0 {
@@ -63,11 +65,11 @@ func (tx *RawTransaction) Hash() string {
 	tx.UpdateRawCode()
 
 	buf.WriteString(strconv.Itoa(int(tx.Timestamp)))
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(tx.SpaceID)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(tx.From)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	// buf.WriteString(tx.Params.Hash())
 	// buf.WriteString(HASH_SEPERATOR)
 	buf.WriteString(string(tx.RawCode))
@@ -93,14 +95,14 @@ func (rtx *RawTransaction) Encode() ([]byte, error) {
 	var buf bytes.Buffer
 
 	hash := rtx.Hash()
-	if len(hash) != MODEL_HASH_STR_LENGTH {
-		return nil, fmt.Errorf("hash must have length %d", MODEL_HASH_STR_LENGTH)
+	if len(hash) != C.MODEL_HASH_STR_LENGTH {
+		return nil, fmt.Errorf("hash must have length %d", C.MODEL_HASH_STR_LENGTH)
 	}
-	if len(rtx.SpaceID) != SPACE_ID_STR_LENGTH {
-		return nil, fmt.Errorf("spaceID must have length %d", SPACE_ID_STR_LENGTH)
+	if len(rtx.SpaceID) != C.SPACE_ID_STR_LENGTH {
+		return nil, fmt.Errorf("spaceID must have length %d", C.SPACE_ID_STR_LENGTH)
 	}
-	if len(rtx.From) != IDENTITY_ADDRESS_STR_LENGTH {
-		return nil, fmt.Errorf("from must have length %d", IDENTITY_ADDRESS_STR_LENGTH)
+	if len(rtx.From) != C.IDENTITY_ADDRESS_STR_LENGTH {
+		return nil, fmt.Errorf("from must have length %d", C.IDENTITY_ADDRESS_STR_LENGTH)
 	}
 
 	buf.WriteString(hash)
@@ -157,7 +159,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return u, nil
 	}
 
-	_, err := readFixedString(MODEL_HASH_STR_LENGTH)
+	_, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read hash: %w", err)
 	}
@@ -167,12 +169,12 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return nil, fmt.Errorf("read timestamp: %w", err)
 	}
 
-	spaceID, err := readFixedString(SPACE_ID_STR_LENGTH)
+	spaceID, err := readFixedString(C.SPACE_ID_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read spaceID: %w", err)
 	}
 
-	from, err := readFixedString(IDENTITY_ADDRESS_STR_LENGTH)
+	from, err := readFixedString(C.IDENTITY_ADDRESS_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read from: %w", err)
 	}

@@ -8,10 +8,9 @@ import (
 	"fortuna/util"
 	"strings"
 	"sync"
-)
 
-const BLOCK_HASH_STR_LENGTH = 64
-const ZERO_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
+	C "fortuna/core/config"
+)
 
 type Block struct {
 	mu sync.Mutex
@@ -37,7 +36,7 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 	if prevBlock != nil {
 		phash = prevBlock.Hash()
 	} else {
-		phash = ZERO_HASH
+		phash = C.ZERO_HASH
 	}
 
 	return &Block{
@@ -48,9 +47,9 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 		PreviousBlockHash:   phash,
 		Executions:          make([]*EventResult, 0, 50),
 		Transactions:        make([]*Transaction, 0, 25),
-		TransactionRootHash: ZERO_HASH,
-		ExecutionRootHash:   ZERO_HASH,
-		UniverseHash:        ZERO_HASH,
+		TransactionRootHash: C.ZERO_HASH,
+		ExecutionRootHash:   C.ZERO_HASH,
+		UniverseHash:        C.ZERO_HASH,
 	}
 }
 
@@ -72,11 +71,11 @@ func (block *Block) Hash() string {
 	var buf strings.Builder
 
 	buf.Write(util.EncodeUint64(uint64(block.Height)))
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(block.PreviousBlockHash)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(block.ExecutionRootHash)
-	buf.WriteString(HASH_SEPERATOR)
+	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(block.TransactionRootHash)
 	// buf.WriteString(HASH_SEPERATOR)
 	// buf.WriteString(block.UniverseHash)
@@ -86,7 +85,7 @@ func (block *Block) Hash() string {
 
 func (block *Block) UpdateTransactionRoot() {
 	if len(block.Transactions) == 0 {
-		block.TransactionRootHash = ZERO_HASH
+		block.TransactionRootHash = C.ZERO_HASH
 		return
 	}
 
@@ -103,7 +102,7 @@ func (block *Block) UpdateTransactionRoot() {
 
 func (block *Block) UpdateExecutionRoot() {
 	if len(block.Executions) == 0 {
-		block.ExecutionRootHash = ZERO_HASH
+		block.ExecutionRootHash = C.ZERO_HASH
 		return
 	}
 
@@ -140,11 +139,11 @@ func (block *Block) Encode() ([]byte, error) {
 
 	hash := block.Hash()
 
-	if len(hash) != BLOCK_HASH_STR_LENGTH {
+	if len(hash) != C.MODEL_HASH_STR_LENGTH {
 		return nil, fmt.Errorf("block has invalid hash: %v", hash)
 	}
 
-	if block.Height > 1 && len(block.PreviousBlockHash) != BLOCK_HASH_STR_LENGTH {
+	if block.Height > 1 && len(block.PreviousBlockHash) != C.MODEL_HASH_STR_LENGTH {
 		return nil, fmt.Errorf("block has invalid previous block hash: %v", hash)
 	}
 
@@ -218,7 +217,7 @@ func DecodeBlock(b []byte) (*Block, error) {
 	}
 
 	// 1. block hash (skip validation)
-	_, err := readFixedString(BLOCK_HASH_STR_LENGTH)
+	_, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read block hash: %w", err)
 	}
@@ -235,7 +234,7 @@ func DecodeBlock(b []byte) (*Block, error) {
 	}
 
 	// 3. previous block hash
-	prevHash, err := readFixedString(BLOCK_HASH_STR_LENGTH)
+	prevHash, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read previous hash: %w", err)
 	}
