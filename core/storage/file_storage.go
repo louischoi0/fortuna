@@ -35,7 +35,7 @@ func DataRootDir() string {
 func NewFile(storage *FileStorage, name string) *File {
 	file := &File{
 		Storage: storage,
-		Path:    filepath.Join(DataRootDir(), storage.Directory, name),
+		Path:    filepath.Join(storage.Directory, name),
 	}
 
 	f, err := os.OpenFile(file.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

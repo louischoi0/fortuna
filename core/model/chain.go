@@ -32,9 +32,14 @@ func (b *blockIndex) Encode() ([]byte, error) {
 	return json.Marshal(b)
 }
 
-func (b *blockIndex) Decode(data []byte) error {
+func DecodeBlockIndex(data []byte) (*blockIndex, error) {
 	//TODO
-	return json.Unmarshal(data, b)
+	blockIndex := &blockIndex{}
+	err := json.Unmarshal(data, blockIndex)
+	if err != nil {
+		return nil, err
+	}
+	return blockIndex, nil
 }
 
 func NewBlockIndex(spaceID string, height int64, fileNo int64, offset int64, size int64) *blockIndex {
@@ -118,13 +123,17 @@ func (c *Chain) CommitBlock(block *Block) error {
 		return fmt.Errorf("height %v is exepcted not %v", c.LastHeight+1, block.Height)
 	}
 
-	lastBlockHash := c.LastBlock.Hash()
-
-	if block.Height != 1 && lastBlockHash != block.PreviousBlockHash {
-		return fmt.Errorf("previous block hash mismatch expected %s not %s", lastBlockHash, block.PreviousBlockHash)
+	if block.Height != 1 && c.LastBlock != nil && c.LastBlock.Hash() != block.PreviousBlockHash {
+		return fmt.Errorf("previous block hash mismatch expected %s not %s", c.LastBlock.Hash(), block.PreviousBlockHash)
+	}
+	if block.Height == 1 && c.LastBlock != nil {
+		return fmt.Errorf("first block must be genesis block")
+	}
+	if block.Height != 1 && c.LastBlock == nil {
+		return fmt.Errorf("last block is nil")
 	}
 
-	if c.IsFileSizeExceed(c.CurrentFile) || c.CurrentFile == nil {
+	if c.CurrentFile == nil || c.IsFileSizeExceed(c.CurrentFile) {
 		if c.CurrentFile != nil {
 			c.CurrentFile.Close()
 		}
@@ -190,7 +199,13 @@ func (c *Chain) GetBlockIndex(height int64) *blockIndex {
 		return nil
 	}
 
-	return value.(*blockIndex)
+	fmt.Println(string(value.([]byte)))
+	blockIndex, err := DecodeBlockIndex(value.([]byte))
+	if err != nil {
+		return nil
+	}
+
+	return blockIndex
 }
 
 func (c *Chain) WriteBlockIndex(blockIndex *blockIndex) error {
@@ -205,9 +220,6 @@ func (c *Chain) WriteBlockIndex(blockIndex *blockIndex) error {
 }
 
 func (c *Chain) SetCurrentFile(file *storage.File) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	err := rock.SetValue(c.meta, "current", []byte(file.Name))
 	if err != nil {
 		return err
@@ -218,9 +230,6 @@ func (c *Chain) SetCurrentFile(file *storage.File) error {
 }
 
 func (c *Chain) SetHeight(height int64) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	err := rock.SetValue(c.meta, "height", []byte(util.EncodeUint64(uint64(height))))
 	if err != nil {
 		return err
@@ -230,9 +239,6 @@ func (c *Chain) SetHeight(height int64) error {
 }
 
 func (c *Chain) GetHeight() (int64, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	height, err := rock.GetValue(c.meta, "height")
 	if err != nil {
 		return 0, err
