@@ -1,7 +1,6 @@
 package rock
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -100,7 +99,7 @@ func SetValue(db *grocksdb.DB, key string, value []byte) error {
 	return err
 }
 
-func GetValue(db *grocksdb.DB, key string) (interface{}, error) {
+func GetValue(db *grocksdb.DB, key string) ([]byte, error) {
 	readOpts := grocksdb.NewDefaultReadOptions()
 	defer readOpts.Destroy()
 
@@ -111,11 +110,5 @@ func GetValue(db *grocksdb.DB, key string) (interface{}, error) {
 	}
 
 	defer value.Free()
-
-	var result interface{}
-	err = json.Unmarshal(value.Data(), &result)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return value.Data(), nil
 }

@@ -261,7 +261,7 @@ func (c *Chain) GetBlockIndex(height int64) (*BlockIndex, error) {
 		return nil, err
 	}
 
-	blockIndex, err := DecodeBlockIndex(value.([]byte))
+	blockIndex, err := DecodeBlockIndex(value)
 	if err != nil {
 		return nil, err
 	}
@@ -275,6 +275,7 @@ func (c *Chain) WriteBlockIndex(blockIndex *BlockIndex) error {
 	if err != nil {
 		return err
 	}
+
 	rock.SetValue(c.meta, key, blockIndexBytes)
 
 	return nil
@@ -304,5 +305,13 @@ func (c *Chain) GetHeight() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int64(height.(uint64)), nil
+	h, err := util.DecodeUint64(height)
+	if err != nil {
+		return 0, err
+	}
+	return int64(h), nil
+}
+
+func (c *Chain) SetMetaDB(meta *grocksdb.DB) {
+	c.meta = meta
 }
