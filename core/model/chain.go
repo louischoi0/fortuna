@@ -7,7 +7,6 @@ import (
 	"fortuna/rock"
 	"fortuna/util"
 	"log"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -47,7 +46,7 @@ func DecodeBlockIndex(data []byte) (*BlockIndex, error) {
 
 	need := func(k int) error {
 		if off+k > n {
-			return fmt.Errorf("buffer underflow: need %d bytes", k)
+			return fmt.Errorf("buffer underflow: need %d bytes, value: %s", k, string(data))
 		}
 		return nil
 	}
@@ -105,6 +104,10 @@ func DecodeBlockIndex(data []byte) (*BlockIndex, error) {
 }
 
 func NewBlockIndex(spaceID string, height int64, fileNo int64, offset int64, size int64) *BlockIndex {
+	if len(spaceID) != 64 {
+		log.Fatalf("spaceID has invalid length %s", spaceID)		
+	}
+
 	return &BlockIndex{
 		SpaceID: spaceID,
 		Height:  height,
@@ -132,7 +135,6 @@ type Chain struct {
 
 func NewChain(spaceID string) *Chain {
 	dir := filepath.Join(storage.DataRootDir(), fmt.Sprintf("chain.%s", spaceID))
-	os.MkdirAll(dir, 0755)
 	storage := storage.NewFileStorage(dir)
 	metaDB, err := rock.GetDBInstance(fmt.Sprintf("chain_additional.%s", spaceID))
 	if err != nil {
@@ -140,18 +142,33 @@ func NewChain(spaceID string) *Chain {
 	}
 
 	return &Chain{
+		SpaceID: spaceID,
 		meta:    metaDB,
 		Storage: storage,
 	}
 }
 
 func (c *Chain) LoadChainData() error {
-	height, err := c.GetHeight()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	height, err := c.ReadLastHeight()
 	if err != nil {
 		return err
 	}
 
 	c.LastHeight = height
+	if len(c.Blocks) != 0 {
+		return fmt.Errorf("chain loaded again")
+	}
+
+	for idx := range(height) {
+		blk, err := c.ReadBlock(idx)
+		if err != nil {
+			return err
+		}
+		c.Blocks = append(c.Blocks, blk)
+	}
 
 	return nil
 }
@@ -196,9 +213,6 @@ func (c *Chain) CommitBlock(block *Block) error {
 	}
 
 	if c.CurrentFile == nil || c.IsFileSizeExceed(c.CurrentFile) {
-		if c.CurrentFile != nil {
-			c.CurrentFile.Close()
-		}
 		c.NewNextBlockFile()
 	}
 
@@ -230,16 +244,29 @@ func (c *Chain) CommitBlock(block *Block) error {
 }
 
 func (c *Chain) GetBlock(height int64) (*Block, error) {
-	blockIndex, err := c.GetBlockIndex(height)
-	if err != nil {
-		return nil, err
+
+	if int(height) > len(c.Blocks) + 1 {
+		return nil, fmt.Errorf("block not found for height: %v", height)
 	}
 
-	fileName := GetFileName(blockIndex.FileNo)
-	file := c.Storage.GetFile(fileName)
-	if file == nil {
-		return nil, fmt.Errorf("file not found")
+	blk := c.Blocks[height-1]
+
+	if blk.Height != height {
+		log.Fatalf("block invalid error block expected height: %v, but %v", blk.Height, height)
 	}
+
+	return blk, nil
+}
+
+func (c *Chain) ReadBlock(height int64) (*Block, error) {
+	blockIndex, err := c.ReadBlockIndex(height)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BlockIndex: %v", err.Error())
+	}
+
+	file := c.CurrentFile
+
+	fmt.Printf("offset: %v blockIndex: %v", blockIndex.Offset, blockIndex.Size)
 
 	blockBytes, err := file.OffsetRead(blockIndex.Offset, blockIndex.Size)
 	if err != nil {
@@ -254,7 +281,7 @@ func (c *Chain) GetBlock(height int64) (*Block, error) {
 	return block, nil
 }
 
-func (c *Chain) GetBlockIndex(height int64) (*BlockIndex, error) {
+func (c *Chain) ReadBlockIndex(height int64) (*BlockIndex, error) {
 	key := fmt.Sprintf(C.BLOCK_INDEX_KEY_FORMAT, height)
 	value, err := rock.GetValue(c.meta, key)
 	if err != nil {
@@ -277,7 +304,7 @@ func (c *Chain) WriteBlockIndex(blockIndex *BlockIndex) error {
 	}
 
 	rock.SetValue(c.meta, key, blockIndexBytes)
-
+	log.Printf("write block index at height %v - size:%v offset: %v buffer_size: %v", blockIndex.Height, blockIndex.Size, blockIndex.Offset, len(blockIndexBytes))
 	return nil
 }
 
@@ -300,7 +327,7 @@ func (c *Chain) SetHeight(height int64) error {
 	return nil
 }
 
-func (c *Chain) GetHeight() (int64, error) {
+func (c *Chain) ReadLastHeight() (int64, error) {
 	height, err := rock.GetValue(c.meta, "height")
 	if err != nil {
 		return 0, err
@@ -310,6 +337,10 @@ func (c *Chain) GetHeight() (int64, error) {
 		return 0, err
 	}
 	return int64(h), nil
+}
+
+func (c *Chain) GetHeight() (int64, error) {
+	return c.LastHeight, nil
 }
 
 func (c *Chain) SetMetaDB(meta *grocksdb.DB) {
