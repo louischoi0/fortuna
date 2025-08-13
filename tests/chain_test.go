@@ -12,13 +12,13 @@ func NewTestChain() *model.Chain {
 	return chain
 }
 
-func NewTestBlock1() *model.Block {
+func NewTestBlock1(h int64) *model.Block {
 	timestamp := 1754354451836053510
 	ebuf := fmt.Sprintf(`{"timestamp": %v, "space_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","publisher": "0000000000000000000000000000000000000000000000000000000000000000","payload":{"a":3},"spec":{"interface_id":"FIC-00-00001","version":"base::v0.0.0","params":{"slot_count":64}},"topic":"","subtopic":"","seperator":"","tag":""}`, timestamp)
 	om, _ := structure.ParseOrderedMap(ebuf)
 	event, _ := model.NewEventFromOrderedMap(om)
 	exec := model.NewEventResultFromEvent(event, "success")
-	block := model.NewBlock("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 1, nil)
+	block := model.NewBlock("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", h, nil)
 
 	block.AppendEventExecution(exec)
 	block.Timestamp = int64(timestamp)
@@ -31,7 +31,9 @@ func NewTestBlock1() *model.Block {
 
 func TestChain(t *testing.T) {
 	chain := NewTestChain()
-	block := NewTestBlock1()
+	height := chain.Next()
+	block := NewTestBlock1(height)
+
 	chain.CommitBlock(block)
 
 	block, err := chain.ReadBlock(1)
@@ -50,10 +52,13 @@ func TestChain(t *testing.T) {
 
 
 	loaded_chain := NewTestChain()
+
 	chain.LoadChainData()
+	chain.Storage.Clear()
 
 	if loaded_chain.LastHeight != 1 {
 		t.Fatalf("expected chain lastheight %v, but %v", 1, loaded_chain.LastHeight)
 	}
+	
 }
 

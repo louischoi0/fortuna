@@ -39,6 +39,7 @@ type File struct {
 	Name    string
 	Path    string
 	f	*os.File
+	removed bool
 }
 
 func DataRootDir() string {
@@ -56,9 +57,20 @@ func NewFile(storage *FileStorage, name string) *File {
 	file := &File{
 		Storage: storage,
 		Path: path,
+		removed: false,
 		f: f,
 	}
 	return file
+}
+
+func (file *File) Delete() error {
+	file.f.Close()
+	err := os.Remove(file.Path)
+	if err != nil {
+		return err
+	}
+	file.removed = true
+	return nil
 }
 
 func (file *File) Clear() error {
@@ -87,6 +99,19 @@ func (file *File) GetSize() int64 {
 	}
 
 	return info.Size()
+}
+
+func (storage *FileStorage) DeleteAll() error {
+	for fn := range(storage.Files) {
+		err := storage.Files[fn].Delete()
+		if err != nil {
+			return err
+		}
+	}
+
+	storage.Files = make(map[string]*File)
+
+	return nil
 }
 
 func (storage *FileStorage) ListFiles(recursive bool) []string {

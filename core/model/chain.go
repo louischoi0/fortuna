@@ -343,6 +343,12 @@ func (c *Chain) GetHeight() (int64, error) {
 	return c.LastHeight, nil
 }
 
+func (c *Chain) Next() int64 {
+	return c.LastHeight + 1
+}
+
 func (c *Chain) SetMetaDB(meta *grocksdb.DB) {
 	c.meta = meta
 }
+
+
