@@ -2,16 +2,16 @@ package storage
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
-	"log"
 	"sync"
 )
 
 type FileStorage struct {
 	mu        sync.Mutex
 	Directory string
-	files	  map[string]*File
+	files     map[string]*File
 }
 
 func NewFileStorage(dir string) *FileStorage {
@@ -19,12 +19,22 @@ func NewFileStorage(dir string) *FileStorage {
 
 	return &FileStorage{
 		Directory: dir,
-		files: make(map[string]*File),
+		files:     make(map[string]*File),
 	}
 }
 
+func (fs *FileStorage) GetOrOpenFile(name string) *File {
+	if file, ok := fs.files[name]; ok {
+		return file
+	}
+
+	file := NewFile(fs, name)
+	fs.files[name] = file
+	return file
+}
+
 func (fs *FileStorage) Clear() error {
-	for fn := range(fs.files) {
+	for fn := range fs.files {
 		err := fs.files[fn].Clear()
 		if err != nil {
 			log.Fatalf(err.Error())
@@ -38,7 +48,7 @@ type File struct {
 	Storage *FileStorage
 	Name    string
 	Path    string
-	f	*os.File
+	f       *os.File
 	removed bool
 }
 
@@ -49,16 +59,16 @@ func DataRootDir() string {
 func NewFile(storage *FileStorage, name string) *File {
 	path := filepath.Join(storage.Directory, name)
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
 	file := &File{
 		Storage: storage,
-		Path: path,
+		Path:    path,
 		removed: false,
-		f: f,
+		f:       f,
 	}
 	return file
 }
@@ -92,7 +102,7 @@ func (file *File) AppendFileBytes(data []byte) error {
 func (file *File) GetSize() int64 {
 	file.mu.Lock()
 	defer file.mu.Unlock()
-	
+
 	info, err := file.f.Stat()
 	if err != nil {
 		return 0
@@ -102,14 +112,14 @@ func (file *File) GetSize() int64 {
 }
 
 func (storage *FileStorage) DeleteAll() error {
-	for fn := range(storage.Files) {
-		err := storage.Files[fn].Delete()
+	for fn := range storage.files {
+		err := storage.files[fn].Delete()
 		if err != nil {
 			return err
 		}
 	}
 
-	storage.Files = make(map[string]*File)
+	storage.files = make(map[string]*File)
 
 	return nil
 }
@@ -146,7 +156,7 @@ func (file *File) OffsetRead(offset int64, size int64) ([]byte, error) {
 	file.mu.Lock()
 	defer file.mu.Unlock()
 
-	_, err := file.f.Seek(offset, os.SEEK_SET)
+	_, err := file.f.Seek(offset, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seek file: %v", err)
 	}

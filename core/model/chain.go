@@ -105,7 +105,7 @@ func DecodeBlockIndex(data []byte) (*BlockIndex, error) {
 
 func NewBlockIndex(spaceID string, height int64, fileNo int64, offset int64, size int64) *BlockIndex {
 	if len(spaceID) != 64 {
-		log.Fatalf("spaceID has invalid length %s", spaceID)		
+		log.Fatalf("spaceID has invalid length %s", spaceID)
 	}
 
 	return &BlockIndex{
@@ -152,17 +152,14 @@ func (c *Chain) LoadChainData() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	height, err := c.ReadLastHeight()
-	if err != nil {
-		return err
-	}
-
+	height := c.ReadLastHeight()
 	c.LastHeight = height
+
 	if len(c.Blocks) != 0 {
 		return fmt.Errorf("chain loaded again")
 	}
 
-	for idx := range(height) {
+	for idx := range height {
 		blk, err := c.ReadBlock(idx)
 		if err != nil {
 			return err
@@ -197,6 +194,10 @@ func (c *Chain) IsFileSizeExceed(f *storage.File) bool {
 func (c *Chain) CommitBlock(block *Block) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if h := c.ReadLastHeight(); h != c.LastHeight {
+		return fmt.Errorf("chain height mismatch expected %v, but %v", c.LastHeight, h)
+	}
 
 	if c.LastHeight+1 != block.Height {
 		return fmt.Errorf("height %v is exepcted not %v", c.LastHeight+1, block.Height)
@@ -245,7 +246,7 @@ func (c *Chain) CommitBlock(block *Block) error {
 
 func (c *Chain) GetBlock(height int64) (*Block, error) {
 
-	if int(height) > len(c.Blocks) + 1 {
+	if int(height) > len(c.Blocks)+1 {
 		return nil, fmt.Errorf("block not found for height: %v", height)
 	}
 
@@ -264,9 +265,11 @@ func (c *Chain) ReadBlock(height int64) (*Block, error) {
 		return nil, fmt.Errorf("failed to get BlockIndex: %v", err.Error())
 	}
 
-	file := c.CurrentFile
+	fileNo := blockIndex.FileNo
+	fileName := GetFileName(fileNo)
+	file := c.Storage.GetOrOpenFile(fileName)
 
-	fmt.Printf("offset: %v blockIndex: %v", blockIndex.Offset, blockIndex.Size)
+	fmt.Printf("offset: %v size: %v", blockIndex.Offset, blockIndex.Size)
 
 	blockBytes, err := file.OffsetRead(blockIndex.Offset, blockIndex.Size)
 	if err != nil {
@@ -327,28 +330,31 @@ func (c *Chain) SetHeight(height int64) error {
 	return nil
 }
 
-func (c *Chain) ReadLastHeight() (int64, error) {
+func (c *Chain) ReadLastHeight() int64 {
 	height, err := rock.GetValue(c.meta, "height")
 	if err != nil {
-		return 0, err
+		return 0
 	}
 	h, err := util.DecodeUint64(height)
 	if err != nil {
-		return 0, err
+		return 0
 	}
-	return int64(h), nil
+	return int64(h)
 }
 
-func (c *Chain) GetHeight() (int64, error) {
-	return c.LastHeight, nil
+func (c *Chain) GetHeight() int64 {
+	return c.LastHeight
 }
 
 func (c *Chain) Next() int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	log.Printf("next height: %v", c.LastHeight+1)
+
 	return c.LastHeight + 1
 }
 
 func (c *Chain) SetMetaDB(meta *grocksdb.DB) {
 	c.meta = meta
 }
-
-

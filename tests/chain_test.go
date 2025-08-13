@@ -31,12 +31,15 @@ func NewTestBlock1(h int64) *model.Block {
 
 func TestChain(t *testing.T) {
 	chain := NewTestChain()
-	height := chain.Next()
+	height := int64(1)
 	block := NewTestBlock1(height)
 
-	chain.CommitBlock(block)
+	err := chain.CommitBlock(block)
+	if err != nil {
+		t.Fatalf("failed to commit block: %v", err)
+	}
 
-	block, err := chain.ReadBlock(1)
+	block, err = chain.ReadBlock(1)
 	if err != nil {
 		t.Fatalf("failed to get block: %v", err)
 	}
@@ -50,15 +53,26 @@ func TestChain(t *testing.T) {
 		t.Fatalf("err: %s", err.Error())
 	}
 
-
 	loaded_chain := NewTestChain()
 
-	chain.LoadChainData()
-	chain.Storage.Clear()
+	loaded_chain.LoadChainData()
+	loaded_chain.Storage.Clear()
 
 	if loaded_chain.LastHeight != 1 {
 		t.Fatalf("expected chain lastheight %v, but %v", 1, loaded_chain.LastHeight)
 	}
-	
-}
 
+	block, err = loaded_chain.ReadBlock(1)
+	if err != nil {
+		t.Fatalf("failed to get block: %v", err)
+	}
+
+	if block == nil {
+		t.Fatalf("block is nil")
+	}
+
+	if block.Height != 1 {
+		t.Fatalf("expected block height %v, but %v", 1, block.Height)
+	}
+
+}

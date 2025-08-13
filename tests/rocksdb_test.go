@@ -1,19 +1,19 @@
 package test
 
 import (
+	"fmt"
 	"fortuna/rock"
 	"testing"
-	"fmt"
 )
 
-func TestBlockIndexCodec(t *testing.T) {
+func TestRocksDB(t *testing.T) {
 	t.Run("encode/decode block index", func(t *testing.T) {
 		testDB, err := rock.GetDBInstance("test")
 		if err != nil {
 			t.Fatalf("failed to get test db: %v", err)
 		}
 		defer rock.CloseDB(testDB)
-		
+
 		key := "hello"
 		value := "world"
 

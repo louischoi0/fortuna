@@ -139,6 +139,10 @@ func (o *Oracle) RegisterHandlers() error {
 }
 
 func (o *Oracle) Shutdown() error {
+	if o.Chain != nil {
+		o.Chain.Storage.Clear()
+	}
+
 	return nil
 }
 
