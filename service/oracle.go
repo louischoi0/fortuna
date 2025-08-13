@@ -140,7 +140,7 @@ func (o *Oracle) RegisterHandlers() error {
 
 func (o *Oracle) Shutdown() error {
 	if o.Chain != nil {
-		o.Chain.Storage.Clear()
+		o.Chain.Storage.Close()
 	}
 
 	return nil

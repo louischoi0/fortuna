@@ -33,9 +33,9 @@ func (fs *FileStorage) GetOrOpenFile(name string) *File {
 	return file
 }
 
-func (fs *FileStorage) Clear() error {
+func (fs *FileStorage) Close() error {
 	for fn := range fs.files {
-		err := fs.files[fn].Clear()
+		err := fs.files[fn].Close()
 		if err != nil {
 			log.Fatalf(err.Error())
 		}
@@ -83,7 +83,7 @@ func (file *File) Delete() error {
 	return nil
 }
 
-func (file *File) Clear() error {
+func (file *File) Close() error {
 	log.Printf("clear storage file %s", file.Path)
 	return file.f.Close()
 }

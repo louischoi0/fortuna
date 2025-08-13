@@ -142,6 +142,7 @@ func NewChain(spaceID string) *Chain {
 	}
 
 	return &Chain{
+		LastHeight: 0,
 		SpaceID: spaceID,
 		meta:    metaDB,
 		Storage: storage,
@@ -166,7 +167,8 @@ func (c *Chain) LoadChainData() error {
 		}
 		c.Blocks = append(c.Blocks, blk)
 	}
-
+	
+	c.LastBlock = c.Blocks[len(c.Blocks)-1]
 	return nil
 }
 
@@ -257,6 +259,17 @@ func (c *Chain) GetBlock(height int64) (*Block, error) {
 	}
 
 	return blk, nil
+}
+
+func (c *Chain) Reset() error {
+	if err := c.Storage.DeleteAll(); err != nil {
+		return err
+	}
+	if err := rock.ClearDB(c.meta); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Chain) ReadBlock(height int64) (*Block, error) {
