@@ -12,16 +12,15 @@ import (
 	C "fortuna/core/config"
 )
 
-type Block struct {
+type Page struct {
 	mu sync.Mutex
 
 	SpaceID   string
-	Timestamp int64
+	Timestamp uint64
 
-	Height            int64
-	Count             int64
-	PreviousBlockHash string
-	PreviousBlock     *Block
+	N            uint64
+	PrevPageHash string
+	PrevPage     *Page
 
 	ExecutionRootHash   string
 	TransactionRootHash string
@@ -31,20 +30,19 @@ type Block struct {
 	Transactions []*Transaction
 }
 
-func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
+func NewPage(spaceID string, pageNum uint64, prevPage *Page) *Page {
 	var phash string
-	if prevBlock != nil {
-		phash = prevBlock.Hash()
+	if prevPage != nil {
+		phash = prevPage.Hash()
 	} else {
 		phash = C.ZERO_HASH
 	}
 
-	return &Block{
+	return &Page{
 		SpaceID:             spaceID,
-		Height:              height,
-		Count:               0,
-		PreviousBlock:       prevBlock,
-		PreviousBlockHash:   phash,
+		N:                   pageNum,
+		PrevPage:            prevPage,
+		PrevPageHash:        phash,
 		Executions:          make([]*EventResult, 0, 50),
 		Transactions:        make([]*Transaction, 0, 25),
 		TransactionRootHash: C.ZERO_HASH,
@@ -53,116 +51,114 @@ func NewBlock(spaceID string, height int64, prevBlock *Block) *Block {
 	}
 }
 
-func (block *Block) AppendTransactionExecution(tx *Transaction) {
-	block.mu.Lock()
-	defer block.mu.Unlock()
+func (page *Page) AppendTransactionExecution(tx *Transaction) {
+	page.mu.Lock()
+	defer page.mu.Unlock()
 
-	block.Transactions = append(block.Transactions, tx)
+	page.Transactions = append(page.Transactions, tx)
 }
 
-func (block *Block) AppendEventExecution(er *EventResult) {
-	block.mu.Lock()
-	defer block.mu.Unlock()
+func (page *Page) AppendEventExecution(er *EventResult) {
+	page.mu.Lock()
+	defer page.mu.Unlock()
 
-	block.Executions = append(block.Executions, er)
+	page.Executions = append(page.Executions, er)
 }
 
-func (block *Block) Hash() string {
+func (page *Page) Hash() string {
 	var buf strings.Builder
 
-	buf.Write(util.EncodeUint64(uint64(block.Height)))
+	buf.Write(util.EncodeUint64(uint64(page.N)))
 	buf.WriteString(C.HASH_SEPERATOR)
-	buf.WriteString(block.PreviousBlockHash)
+	buf.WriteString(page.PrevPageHash)
 	buf.WriteString(C.HASH_SEPERATOR)
-	buf.WriteString(block.ExecutionRootHash)
+	buf.WriteString(page.ExecutionRootHash)
 	buf.WriteString(C.HASH_SEPERATOR)
-	buf.WriteString(block.TransactionRootHash)
-	// buf.WriteString(HASH_SEPERATOR)
-	// buf.WriteString(block.UniverseHash)
+	buf.WriteString(page.TransactionRootHash)
 
 	return crypto.SHA256(buf.String())
 }
 
-func (block *Block) UpdateTransactionRoot() {
-	if len(block.Transactions) == 0 {
-		block.TransactionRootHash = C.ZERO_HASH
+func (page *Page) UpdateTransactionRoot() {
+	if len(page.Transactions) == 0 {
+		page.TransactionRootHash = C.ZERO_HASH
 		return
 	}
 
-	contents := make([]structure.Content, len(block.Transactions))
-	for i, er := range block.Transactions {
+	contents := make([]structure.Content, len(page.Transactions))
+	for i, er := range page.Transactions {
 		contents[i] = er
 	}
 	mt, err := structure.NewTree(contents)
 	if err != nil {
 		panic(err)
 	}
-	block.TransactionRootHash = string(mt.MerkleRoot())
+	page.TransactionRootHash = string(mt.MerkleRoot())
 }
 
-func (block *Block) UpdateExecutionRoot() {
-	if len(block.Executions) == 0 {
-		block.ExecutionRootHash = C.ZERO_HASH
+func (page *Page) UpdateExecutionRoot() {
+	if len(page.Executions) == 0 {
+		page.ExecutionRootHash = C.ZERO_HASH
 		return
 	}
 
-	contents := make([]structure.Content, len(block.Executions))
-	for i, er := range block.Executions {
+	contents := make([]structure.Content, len(page.Executions))
+	for i, er := range page.Executions {
 		contents[i] = er
 	}
 	mt, err := structure.NewTree(contents)
 	if err != nil {
 		panic(err)
 	}
-	block.ExecutionRootHash = string(mt.MerkleRoot())
+	page.ExecutionRootHash = string(mt.MerkleRoot())
 }
 
-func (block *Block) Verify() error {
-	if len(block.Transactions) == 0 && len(block.Executions) == 0 {
-		return fmt.Errorf("block has no transaction and event")
+func (page *Page) Verify() error {
+	if len(page.Transactions) == 0 && len(page.Executions) == 0 {
+		return fmt.Errorf("page has no transaction and event")
 	}
 
-	if block.Height == 0 {
-		return fmt.Errorf("block has height zero")
+	if page.N == 0 {
+		return fmt.Errorf("page has height zero")
 	}
 
-	if block.Height != 1 && block.PreviousBlockHash == "" {
-		return fmt.Errorf("block has height zero")
+	if page.N != 1 && page.PrevPageHash == "" {
+		return fmt.Errorf("page has height zero")
 	}
 	return nil
 }
 
-func (block *Block) Encode() ([]byte, error) {
-	if err := block.Verify(); err != nil {
+func (page *Page) Encode() ([]byte, error) {
+	if err := page.Verify(); err != nil {
 		return nil, err
 	}
 
-	hash := block.Hash()
+	hash := page.Hash()
 
 	if len(hash) != C.MODEL_HASH_STR_LENGTH {
-		return nil, fmt.Errorf("block has invalid hash: %v", hash)
+		return nil, fmt.Errorf("page has invalid hash: %v", hash)
 	}
 
-	if block.Height > 1 && len(block.PreviousBlockHash) != C.MODEL_HASH_STR_LENGTH {
-		return nil, fmt.Errorf("block has invalid previous block hash: %v", hash)
+	if page.N > 1 && len(page.PrevPageHash) != C.MODEL_HASH_STR_LENGTH {
+		return nil, fmt.Errorf("page has invalid previous page hash: %v", hash)
 	}
 
 	var buf bytes.Buffer
 	buf.WriteString(hash)
-	buf.Write(util.EncodeUint64(uint64(block.Height)))
-	buf.Write(util.EncodeUint64(uint64(block.Timestamp)))
+	buf.Write(util.EncodeUint64(uint64(page.N)))
+	buf.Write(util.EncodeUint64(uint64(page.Timestamp)))
 
-	buf.WriteString(block.PreviousBlockHash)
-	// buf.WriteString(block.TransactionRootHash)
-	// buf.WriteString(block.ExecutionRootHash)
+	buf.WriteString(page.PrevPageHash)
+	buf.WriteString(page.TransactionRootHash)
+	buf.WriteString(page.ExecutionRootHash)
 
-	txCount := len(block.Transactions)
-	EventCount := len(block.Executions)
+	txCount := len(page.Transactions)
+	EventCount := len(page.Executions)
 
 	buf.Write(util.EncodeUint64(uint64(EventCount)))
 	buf.Write(util.EncodeUint64(uint64(txCount)))
 
-	for _, event := range block.Executions {
+	for _, event := range page.Executions {
 		eventBuffer, err := event.Encode()
 		eventBufferSize := len(eventBuffer)
 		if err != nil {
@@ -172,7 +168,7 @@ func (block *Block) Encode() ([]byte, error) {
 		buf.Write(eventBuffer)
 	}
 
-	for _, tx := range block.Transactions {
+	for _, tx := range page.Transactions {
 		txBuffer, err := tx.Encode()
 		txBufferSize := len(txBuffer)
 		if err != nil {
@@ -184,7 +180,7 @@ func (block *Block) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func DecodeBlock(b []byte) (*Block, error) {
+func DecodePage(b []byte) (*Page, error) {
 	var (
 		off = 0
 		n   = len(b)
@@ -216,15 +212,15 @@ func DecodeBlock(b []byte) (*Block, error) {
 		return v, nil
 	}
 
-	// 1. block hash (skip validation)
+	// 1. page hash (skip validation)
 	_, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
-		return nil, fmt.Errorf("read block hash: %w", err)
+		return nil, fmt.Errorf("read page hash: %w", err)
 	}
 
-	height, err := readU64LE()
+	pageNum, err := readU64LE()
 	if err != nil {
-		return nil, fmt.Errorf("read height: %w", err)
+		return nil, fmt.Errorf("read page num: %w", err)
 	}
 
 	// 2. timestamp
@@ -233,7 +229,7 @@ func DecodeBlock(b []byte) (*Block, error) {
 		return nil, fmt.Errorf("read timestamp: %w", err)
 	}
 
-	// 3. previous block hash
+	// 3. previous page hash
 	prevHash, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read previous hash: %w", err)
@@ -292,16 +288,20 @@ func DecodeBlock(b []byte) (*Block, error) {
 		txs = append(txs, tx)
 	}
 
-	block := &Block{
-		Height:            int64(height),
-		Timestamp:         int64(ts),
-		PreviousBlockHash: prevHash,
-		Executions:        events,
-		Transactions:      txs,
+	page := &Page{
+		N:            pageNum,
+		Timestamp:    ts,
+		PrevPageHash: prevHash,
+		Executions:   events,
+		Transactions: txs,
 	}
 
-	block.UpdateExecutionRoot()
-	block.UpdateTransactionRoot()
+	page.UpdateExecutionRoot()
+	page.UpdateTransactionRoot()
 
-	return block, nil
+	return page, nil
+}
+
+func (page *Page) GetPageNum() uint64 {
+	return page.N
 }

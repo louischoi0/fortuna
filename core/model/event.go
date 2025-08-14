@@ -448,6 +448,10 @@ type EventResult struct {
 	Err       *EventExecutionError `json:"error"`
 }
 
+func (xr *EventResult) GetSpaceID() string {
+	return xr.Event.SpaceID
+}
+
 func (xr *EventResult) Buffer() []byte {
 	return []byte(xr.String())
 }

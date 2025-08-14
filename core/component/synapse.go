@@ -11,22 +11,18 @@ const BASIC_NODE_STATE_COUNT = 256
 
 type Synapse struct {
 	ID        string
-	SpaceID   string
+	Space     *model.Space
 	Epoch     int64
 	EpochHash string
 
 	machines map[vm.KernelVersion]*vm.StateMachine
-	Universe *vm.Universe
-
 	confirms []*model.EventResult
 }
 
-func NewSynapse(spaceID string) *Synapse {
-	universe := vm.NewUniverse(spaceID)
+func NewSynapse(space *model.Space) *Synapse {
 
 	return &Synapse{
-		SpaceID:  spaceID,
-		Universe: universe,
+		Space:    space,
 		Epoch:    0,
 		machines: make(map[vm.KernelVersion]*vm.StateMachine),
 		confirms: make([]*model.EventResult, 0, 100),
@@ -34,7 +30,7 @@ func NewSynapse(spaceID string) *Synapse {
 }
 
 func (n *Synapse) InitMachines() error {
-	machine := vm.NewBasicStateMachine(n.Universe, n.SpaceID, 256)
+	machine := vm.NewBasicStateMachine(n.Space, 256)
 	machine.ResetState()
 
 	n.machines[vm.BaseV000] = machine

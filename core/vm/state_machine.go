@@ -15,7 +15,6 @@ type ResetStateSignal struct {
 type StateMachine struct {
 	ID         string
 	SpaceID    string
-	Universe   *Universe
 	LastHeight int64
 
 	State      *model.StateVector
@@ -32,10 +31,9 @@ type StateMachine struct {
 	reset_state_signal chan *ResetStateSignal
 }
 
-func NewBasicStateMachine(universe *Universe, SpaceID string, stateCount int64) *StateMachine {
+func NewBasicStateMachine(space *model.Space, stateCount int64) *StateMachine {
 	machine := &StateMachine{
-		Universe:    universe,
-		SpaceID:     SpaceID,
+		SpaceID:     space.SpaceID,
 		StateCount:  stateCount,
 		State:       model.NewStateVector(make([]int64, stateCount)),
 		StateKernel: &BasicStateKernel{},

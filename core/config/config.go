@@ -1,10 +1,10 @@
 package config
 
 const (
-	SPACE_ID_LENGTH        = 64
-	BLOCK_INDEX_KEY_FORMAT = "blkidx:%06d"
-	BLOCK_FILE_SIZE        = 1024 * 1024 * 256
-	BLOCK_FILE_NAME_FORMAT = "blk%06d"
+	SPACE_ID_LENGTH       = 64
+	PAGE_INDEX_KEY_FORMAT = "pgidx:%06d"
+	PAGE_FILE_SIZE        = 1024 * 1024 * 256
+	PAGE_FILE_NAME_FORMAT = "pg%06d"
 
 	HASH_SEPERATOR              = ":"
 	IDENTITY_ADDRESS_STR_LENGTH = 64

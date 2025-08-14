@@ -27,13 +27,12 @@ var oracle *Oracle
 type Oracle struct {
 	mu sync.Mutex
 
-	spaceID 	string
-	universe	*grocksdb.DB
+	spaceID  string
+	universe *grocksdb.DB
 
-	Chains		map[string]*model.Chain
-	currentBlock 	*model.Block
+	Universe map[string]*model.Space
 
-	priorityQueue 	*structure.PriorityQueue
+	priorityQueue *structure.PriorityQueue
 
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction
@@ -49,12 +48,12 @@ type OracleConfig struct {
 }
 
 func (o *Oracle) AllocateSpace(spaceID string) error {
-	if _, exists := o.chains[spaceID]; exists {
+	if _, exists := o.Universe[spaceID]; exists {
 		return fmt.Errorf("spaceID %s already exists", spaceID)
 	}
-		
-	chain := model.NewChain(spaceID)
-	o.chains[spaceID] = chain
+
+	space := model.NewSpace(spaceID)
+	o.Universe[spaceID] = space
 
 	return nil
 }
@@ -63,11 +62,18 @@ func GetOracleService(spaceID string, config OracleConfig) *Oracle {
 	oracleOnce.Do(func() {
 		universeDB, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
 		if err != nil {
-			log.Fatalf(err.Error())
+			log.Fatalf("failed to get universe db: %v", err.Error())
+		}
+
+		space := model.NewSpace(spaceID)
+		err = space.LoadSpaceData()
+
+		if err != nil {
+			log.Fatalf("failed to load space data: %v", err.Error())
 		}
 
 		swift := swift.NewServer()
-		syn := component.NewSynapse(spaceID)
+		syn := component.NewSynapse(space)
 
 		oracle = &Oracle{
 			spaceID:           spaceID,
@@ -76,14 +82,14 @@ func GetOracleService(spaceID string, config OracleConfig) *Oracle {
 			universe:          universeDB,
 			swift:             swift,
 			syn:               syn,
-			chains:            make(map[string]*Chain),
+			Universe:          make(map[string]*model.Space),
 		}
 	})
 
 	return oracle
 }
 
-func (o *Oracle) VerifyBlock(block *model.Block) error {
+func (o *Oracle) VerifyPage(page *model.Page) error {
 	return nil
 }
 
@@ -95,24 +101,37 @@ func (o *Oracle) ProcessEventResultBuffer(event *model.EventResult) error {
 	for {
 		select {
 		case event := <-o.eventBuffer:
-			o.currentBlock.AppendEventExecution(event)
+			space, err := o.GetSpace(event.GetSpaceID())
+			if err != nil {
+				return err
+			}
+
+			if space.LastPage == nil {
+				return fmt.Errorf("space %s has no last page", event.GetSpaceID())
+			}
+
+			space.LastPage.AppendEventExecution(event)
 		}
 	}
 }
-func (o *Oracle) GetChain(spaceID string) (*Chain, error) {
-	
+func (o *Oracle) GetSpace(spaceID string) (*model.Space, error) {
+	u, ok := o.Universe[spaceID]
+	if !ok {
+		return nil, fmt.Errorf("spaceID %s not found", spaceID)
+	}
 
+	return u, nil
 }
 
-func (o *Oracle) CommitBlock(block *model.Block) error {
+func (o *Oracle) CommitPage(page *model.Page) error {
 
-	if err := o.VerifyBlock(block); err != nil {
+	if err := o.VerifyPage(page); err != nil {
 		return err
 	}
 
-	space.bl
+	space := o.Universe[o.spaceID]
 
-	err := o.Chain.CommitBlock(block)
+	err := space.CommitPage(page)
 	if err != nil {
 		return err
 	}
@@ -156,12 +175,8 @@ func (o *Oracle) RegisterHandlers() error {
 }
 
 func (o *Oracle) Shutdown() error {
-	if o.Chain != nil {
-	}
-
-	for c := range(o.chains) {
-		ch, _ := o.chains[c]
-		ch.Chain.Storage.Close()
+	for _, s := range o.Universe {
+		s.Storage.Close()
 	}
 
 	return nil
