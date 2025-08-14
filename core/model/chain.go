@@ -118,25 +118,28 @@ func NewBlockIndex(spaceID string, height int64, fileNo int64, offset int64, siz
 }
 
 type Chain struct {
-	mu        sync.Mutex
-	SpaceID   string
-	LastBlock *Block
-	Blocks    []*Block
+	mu        	sync.Mutex
+	SpaceID   	string
 
-	Storage *storage.FileStorage
-	meta    *grocksdb.DB
+	LastHeight     	int64
+	LastBlock 	*Block
 
-	FileNo      int64
-	CurrentFile *storage.File
+	Blocks    	[]*Block
 
-	LastHeight     int64
-	LastAppendedAt time.Time
+	Storage 	*storage.FileStorage
+	meta    	*grocksdb.DB
+
+	FileNo      	int64
+	CurrentFile 	*storage.File
+
+	LastAppendedAt 	time.Time
 }
 
 func NewChain(spaceID string) *Chain {
 	dir := filepath.Join(storage.DataRootDir(), fmt.Sprintf("chain.%s", spaceID))
 	storage := storage.NewFileStorage(dir)
 	metaDB, err := rock.GetDBInstance(fmt.Sprintf("chain_additional.%s", spaceID))
+
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -160,15 +163,15 @@ func (c *Chain) LoadChainData() error {
 		return fmt.Errorf("chain loaded again")
 	}
 
-	for idx := range height {
-		blk, err := c.ReadBlock(idx)
+	for i := 1; int64(i) <= c.LastHeight; i++ {
+		blk, err := c.ReadBlock(int64(i))
 		if err != nil {
 			return err
 		}
 		c.Blocks = append(c.Blocks, blk)
 	}
 	
-	c.LastBlock = c.Blocks[len(c.Blocks)-1]
+	c.LastBlock = c.Blocks[c.LastHeight-1]
 	return nil
 }
 
@@ -211,7 +214,7 @@ func (c *Chain) CommitBlock(block *Block) error {
 	if block.Height == 1 && c.LastBlock != nil {
 		return fmt.Errorf("first block must be genesis block")
 	}
-	if block.Height != 1 && c.LastBlock == nil {
+	if block.Height > 1 && c.LastBlock == nil {
 		return fmt.Errorf("last block is nil")
 	}
 

@@ -56,9 +56,13 @@ func TestChain(t *testing.T) {
 	}
 
 	loaded_chain := NewTestChain()
+	defer func() {
+		if err := loaded_chain.Reset(); err != nil {
+			t.Fatalf("failed to reset storage: %s", err.Error())
+		}
+	}()
 
 	loaded_chain.LoadChainData()
-	loaded_chain.Storage.DeleteAll()
 
 	if loaded_chain.LastHeight != block.Height {
 		t.Fatalf("expected chain lastheight %v, but %v", 1, loaded_chain.LastHeight)
@@ -78,6 +82,8 @@ func TestChain(t *testing.T) {
 	}
 
 	block2 := NewTestBlock1(int64(2))
+	block2.PreviousBlockHash = block.Hash()
+
 	err = loaded_chain.CommitBlock(block2)
 	
 	if err != nil {
@@ -94,8 +100,5 @@ func TestChain(t *testing.T) {
 		t.Fatalf("hash err")
 	}
 
-	if err := loaded_chain.Reset(); err != nil {
-		t.Fatalf("failed to reset storage: %s", err.Error())
-	}
 
 }

@@ -27,13 +27,13 @@ var oracle *Oracle
 type Oracle struct {
 	mu sync.Mutex
 
-	spaceID string
-	metaDB  *grocksdb.DB
+	spaceID 	string
+	universe	*grocksdb.DB
 
-	Chain        *model.Chain
-	currentBlock *model.Block
+	Chains		map[string]*model.Chain
+	currentBlock 	*model.Block
 
-	priorityQueue *structure.PriorityQueue
+	priorityQueue 	*structure.PriorityQueue
 
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction
@@ -48,25 +48,35 @@ type OracleConfig struct {
 	TransactionBufferSize     int64
 }
 
+func (o *Oracle) AllocateSpace(spaceID string) error {
+	if _, exists := o.chains[spaceID]; exists {
+		return fmt.Errorf("spaceID %s already exists", spaceID)
+	}
+		
+	chain := model.NewChain(spaceID)
+	o.chains[spaceID] = chain
+
+	return nil
+}
+
 func GetOracleService(spaceID string, config OracleConfig) *Oracle {
 	oracleOnce.Do(func() {
-		metaDB, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
+		universeDB, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
 		if err != nil {
 			log.Fatalf(err.Error())
 		}
 
 		swift := swift.NewServer()
 		syn := component.NewSynapse(spaceID)
-		chain := model.NewChain(spaceID)
 
 		oracle = &Oracle{
 			spaceID:           spaceID,
 			eventBuffer:       make(chan *model.EventResult, EVENT_BUFFER_SIZE),
 			transactionBuffer: make(chan *model.Transaction, TRANSACTION_BUFFER_SIZE),
-			metaDB:            metaDB,
+			universe:          universeDB,
 			swift:             swift,
 			syn:               syn,
-			Chain:             chain,
+			chains:            make(map[string]*Chain),
 		}
 	})
 
@@ -89,11 +99,18 @@ func (o *Oracle) ProcessEventResultBuffer(event *model.EventResult) error {
 		}
 	}
 }
+func (o *Oracle) GetChain(spaceID string) (*Chain, error) {
+	
+
+}
 
 func (o *Oracle) CommitBlock(block *model.Block) error {
+
 	if err := o.VerifyBlock(block); err != nil {
 		return err
 	}
+
+	space.bl
 
 	err := o.Chain.CommitBlock(block)
 	if err != nil {
@@ -140,7 +157,11 @@ func (o *Oracle) RegisterHandlers() error {
 
 func (o *Oracle) Shutdown() error {
 	if o.Chain != nil {
-		o.Chain.Storage.Close()
+	}
+
+	for c := range(o.chains) {
+		ch, _ := o.chains[c]
+		ch.Chain.Storage.Close()
 	}
 
 	return nil
