@@ -51,6 +51,10 @@ func NewPage(spaceID string, pageNum uint64, prevPage *Page) *Page {
 	}
 }
 
+func (page *Page) GetCount() int {
+	return len(page.Executions) + len(page.Transactions)
+}
+
 func (page *Page) AppendTransactionExecution(tx *Transaction) {
 	page.mu.Lock()
 	defer page.mu.Unlock()
@@ -119,11 +123,11 @@ func (page *Page) Verify() error {
 	}
 
 	if page.N == 0 {
-		return fmt.Errorf("page has height zero")
+		return fmt.Errorf("page has num zero")
 	}
 
 	if page.N != 1 && page.PrevPageHash == "" {
-		return fmt.Errorf("page has height zero")
+		return fmt.Errorf("page has num zero")
 	}
 	return nil
 }

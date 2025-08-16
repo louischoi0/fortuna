@@ -49,7 +49,7 @@ func CreateGenVectorAPI() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base-v0.0.0", "kernel version")
+	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base:v.0.0", "kernel version")
 	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
 	cmd.Flags().StringVarP(&seed, "seed", "s", "abc", "seed")
 	cmd.Flags().Int64VarP(&size, "size", "z", 8, "size")
@@ -82,7 +82,7 @@ func CreateGenStateSeedAPI() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base-v0.0.0", "kernel version")
+	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base:v.0.0", "kernel version")
 	cmd.Flags().StringVarP(&payload, "payload", "p", "", "payload")
 	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
 

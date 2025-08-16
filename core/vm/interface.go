@@ -3,6 +3,7 @@ package vm
 import (
 	"fmt"
 	"fortuna/core/model"
+	"log"
 )
 
 type EventResultCode string
@@ -58,14 +59,15 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 		return NewErrorEventResultRequiredParameter(event, "slot_count is bigger than legth of machine state")
 	}
 
-	indices := kernel.GenIndex(seed, 0, slot_count, 2)
-	a := indices[0] % slot_count
-	b := indices[1] % slot_count
+	indices := kernel.GenIndex(seed, 0, int64(slot_count), 2)
+	a := indices[0] % uint64(slot_count)
+	b := indices[1] % uint64(slot_count)
 
-	fmt.Printf("seed=%v, a=%v, b=%v, sa=%v, ba=%v", seed, a, b, machine.State.Get(a), machine.State.Get(b))
+	log.Printf("seed=%v, a=%v, b=%v", seed, a, b)
+	log.Printf("sa=%v, sb=%v", machine.State.Get(int64(a)), machine.State.Get(int64(b)))
 
 	var result string
-	if machine.State.Get(a) > machine.State.Get(b) {
+	if machine.State.Get(int64(a)) > machine.State.Get(int64(b)) {
 		result = "t"
 	} else {
 		result = "f"

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"fortuna/core/model"
 	"fortuna/core/vm"
 	"fortuna/structure"
@@ -11,8 +12,7 @@ import (
 	"log"
 )
 
-func (o *Oracle) StartUp() error {
-
+func (o *Oracle) RegisterHandlers() error {
 	o.swift.RegisterHandler(swift.PacketTypeGenVectorRequest, func(ctx context.Context, packet *swift.Packet) error {
 		omap, err := structure.ParseOrderedMap(string(packet.Payload))
 		if err != nil {
@@ -34,7 +34,13 @@ func (o *Oracle) StartUp() error {
 			return o.swift.SendErrorResponse(ctx, "payload must have key: size")
 		}
 
-		machine, err := o.syn.LoadMachine(vm.KernelVersion(kernelVersion))
+		spaceID, ok := omap.String("space_id")
+		if !ok {
+			return o.swift.SendErrorResponse(ctx, "payload must have key: space_id")
+		}
+
+		syn := o.GetSynapse(spaceID)
+		machine, err := syn.LoadMachine(vm.KernelVersion(kernelVersion))
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
 		}
@@ -53,6 +59,25 @@ func (o *Oracle) StartUp() error {
 		return nil
 	})
 
+	o.swift.RegisterHandler(swift.PacketTypeOracleGETSpaceRequest, func(ctx context.Context, packet *swift.Packet) error {
+		spaces, err := o.ListSpaces()
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		buffer, err := json.Marshal(spaces)
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		response := &swift.Packet{
+			Type:    swift.PacketTypeOracleGETSpaceResponse,
+			Payload: json.RawMessage(buffer),
+		}
+
+		return o.swift.Send(ctx, response)
+	})
+
 	o.swift.RegisterHandler(swift.PacketTypeStateSeedAPIRequest, func(ctx context.Context, packet *swift.Packet) error {
 		omap, err := structure.ParseOrderedMap(string(packet.Payload))
 		if err != nil {
@@ -69,7 +94,13 @@ func (o *Oracle) StartUp() error {
 			return o.swift.SendErrorResponse(ctx, "payload must have key: payload")
 		}
 
-		machine, err := o.syn.LoadMachine(vm.KernelVersion(kernelVersion))
+		spaceID, ok := omap.String("space_id")
+		if !ok {
+			return o.swift.SendErrorResponse(ctx, "payload must have key: space_id")
+		}
+
+		syn := o.GetSynapse(spaceID)
+		machine, err := syn.LoadMachine(vm.KernelVersion(kernelVersion))
 		seed := machine.StateKernel.GenStateSeedPayload(payload)
 		buffer, err := json.Marshal(seed)
 
@@ -106,7 +137,13 @@ func (o *Oracle) StartUp() error {
 			return o.swift.SendErrorResponse(ctx, err.Error())
 		}
 
-		result, err := o.syn.Confirm(event)
+		if space, err := o.GetSpace(event.SpaceID); err != nil || space == nil {
+			return o.swift.SendErrorResponse(ctx, fmt.Sprintf("space '%s' not found", event.SpaceID))
+		}
+
+		syn := o.GetSynapse(event.SpaceID)
+		result, err := syn.Confirm(event)
+		o.eventBuffer <- result
 
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
@@ -121,6 +158,14 @@ func (o *Oracle) StartUp() error {
 
 		return o.swift.Send(ctx, response)
 	})
+
+	return nil
+}
+
+func (o *Oracle) Bootstrap() error {
+	if err := o.RegisterHandlers(); err != nil {
+		return err
+	}
 
 	return nil
 }

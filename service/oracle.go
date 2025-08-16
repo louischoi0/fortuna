@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	"fortuna/core/component"
 	"fortuna/core/model"
@@ -37,8 +36,8 @@ type Oracle struct {
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction
 
-	swift *swift.TCPServer
-	syn   *component.Synapse
+	swift    *swift.TCPServer
+	synapses map[string]*component.Synapse
 }
 
 type OracleConfig struct {
@@ -47,15 +46,40 @@ type OracleConfig struct {
 	TransactionBufferSize     int64
 }
 
-func (o *Oracle) AllocateSpace(spaceID string) error {
+func (o *Oracle) GetSynapse(spaceID string) *component.Synapse {
+	syn, ok := o.synapses[spaceID]
+	if !ok {
+		return nil
+	}
+
+	return syn
+}
+
+func (o *Oracle) AllocateSpace(spaceID string) (*model.Space, error) {
 	if _, exists := o.Universe[spaceID]; exists {
-		return fmt.Errorf("spaceID %s already exists", spaceID)
+		return nil, fmt.Errorf("spaceID %s already exists", spaceID)
 	}
 
 	space := model.NewSpace(spaceID)
 	o.Universe[spaceID] = space
 
-	return nil
+	syn := component.NewSynapse(space)
+	if err := syn.Bootstrap(); err != nil {
+		return nil, fmt.Errorf("failed to bootstrap synapse: %v", err.Error())
+	}
+
+	o.synapses[spaceID] = syn
+
+	return space, nil
+}
+
+func (o *Oracle) ListSpaces() ([]string, error) {
+	spaces := make([]string, 0)
+	for spaceID := range o.Universe {
+		spaces = append(spaces, spaceID)
+	}
+
+	return spaces, nil
 }
 
 func GetOracleService(spaceID string, config OracleConfig) *Oracle {
@@ -65,15 +89,11 @@ func GetOracleService(spaceID string, config OracleConfig) *Oracle {
 			log.Fatalf("failed to get universe db: %v", err.Error())
 		}
 
-		space := model.NewSpace(spaceID)
-		err = space.LoadSpaceData()
-
 		if err != nil {
 			log.Fatalf("failed to load space data: %v", err.Error())
 		}
 
 		swift := swift.NewServer()
-		syn := component.NewSynapse(space)
 
 		oracle = &Oracle{
 			spaceID:           spaceID,
@@ -81,8 +101,13 @@ func GetOracleService(spaceID string, config OracleConfig) *Oracle {
 			transactionBuffer: make(chan *model.Transaction, TRANSACTION_BUFFER_SIZE),
 			universe:          universeDB,
 			swift:             swift,
-			syn:               syn,
+			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
+		}
+
+		_, err = oracle.AllocateSpace(spaceID)
+		if err != nil {
+			log.Fatalf("failed to allocate space: %v", err.Error())
 		}
 	})
 
@@ -97,23 +122,40 @@ func (o *Oracle) VerifyEventResult(event *model.EventResult) error {
 	return nil
 }
 
-func (o *Oracle) ProcessEventResultBuffer(event *model.EventResult) error {
+func (o *Oracle) Daemon() error {
+	log.Printf("oracle daemon started")
+
 	for {
 		select {
 		case event := <-o.eventBuffer:
+			log.Println("process event result buffer: ", event.GetSpaceID())
+
 			space, err := o.GetSpace(event.GetSpaceID())
 			if err != nil {
-				return err
+				log.Fatalf("failed to get space: %v", err.Error())
 			}
 
-			if space.LastPage == nil {
-				return fmt.Errorf("space %s has no last page", event.GetSpaceID())
+			if space.CurrentPage == nil {
+				log.Fatalf("space %s has no current page", event.GetSpaceID())
 			}
 
-			space.LastPage.AppendEventExecution(event)
+			space.CurrentPage.AppendEventExecution(event)
+
+			if o.ShouldCommitPage(space.CurrentPage) {
+				err = o.CommitPage(space.CurrentPage)
+				if err != nil {
+					log.Fatalf("failed to commit page: %v", err.Error())
+				}
+			}
 		}
 	}
 }
+
+func (o *Oracle) ShouldCommitPage(page *model.Page) bool {
+	log.Println("should commit page: ", page.GetCount())
+	return page.GetCount() > 3
+}
+
 func (o *Oracle) GetSpace(spaceID string) (*model.Space, error) {
 	u, ok := o.Universe[spaceID]
 	if !ok {
@@ -139,41 +181,6 @@ func (o *Oracle) CommitPage(page *model.Page) error {
 	return nil
 }
 
-func (c *Oracle) Bootstrap() error {
-	return nil
-}
-
-const (
-	PacketTypeConfirmEventRequest  swift.PacketType = 101
-	PacketTypeConfirmEventResponse swift.PacketType = 102
-)
-
-func (o *Oracle) RegisterHandlers() error {
-
-	o.swift.RegisterHandler(PacketTypeConfirmEventRequest, func(ctx context.Context, packet *swift.Packet) error {
-		er, err := model.DecodeEventResult(packet.Payload)
-		if err != nil {
-			return o.swift.SendErrorResponse(ctx, err.Error())
-		}
-
-		if err := o.VerifyEventResult(er); err != nil {
-			return o.swift.SendErrorResponse(ctx, err.Error())
-		}
-
-		o.eventBuffer <- er
-		return nil
-	})
-
-	o.swift.RegisterHandler(swift.PacketTypePing, func(ctx context.Context, packet *swift.Packet) error {
-		return o.swift.Send(ctx, &swift.Packet{
-			Type:    swift.PacketTypePong,
-			Payload: []byte("pong"),
-		})
-	})
-
-	return nil
-}
-
 func (o *Oracle) Shutdown() error {
 	for _, s := range o.Universe {
 		s.Storage.Close()
@@ -183,20 +190,17 @@ func (o *Oracle) Shutdown() error {
 }
 
 func (o *Oracle) Run(port int) error {
-	if err := o.syn.Run(); err != nil {
-		log.Fatalf("Failed to start synapse: %v", err.Error())
-	}
-
 	if err := o.swift.Start(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err.Error())
 	}
 
-	if err := o.RegisterHandlers(); err != nil {
-		log.Fatalf("Failed to register handlers: %v", err.Error())
+	if err := o.Bootstrap(); err != nil {
+		log.Fatalf("Failed to bootstrap: %v", err.Error())
 	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go o.Daemon()
 
 	<-sigChan
 

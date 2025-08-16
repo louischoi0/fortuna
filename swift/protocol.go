@@ -16,18 +16,18 @@ const (
 	PacketTypePing          PacketType = 1
 	PacketTypePong          PacketType = 2
 	PacketTypeErrorResponse PacketType = 9
+)
 
-	PacketTypeEmitEventRequest  PacketType = 11
-	PacketTypeEmitEventResponse PacketType = 12
+const (
+	PacketTypeGenVectorRequest     PacketType = 0x01
+	PacketTypeStateSeedAPIRequest  PacketType = 0x02
+	PacketTypeEmitEventRequest     PacketType = 0x03
+	PacketTypeGenVectorResponse    PacketType = 0x04
+	PacketTypeStateSeedAPIResponse PacketType = 0x05
+	PacketTypeEmitEventResponse    PacketType = 0x06
 
-	PacketTypeStateSeedAPIRequest  PacketType = 13
-	PacketTypeStateSeedAPIResponse PacketType = 14
-
-	PacketTypeGenVectorRequest  PacketType = 15
-	PacketTypeGenVectorResponse PacketType = 16
-
-	PacketTypeVerifyEventResultRequest  PacketType = 17
-	PacketTypeVerifyEventResultResponse PacketType = 18
+	PacketTypeOracleGETSpaceRequest  PacketType = 0x07
+	PacketTypeOracleGETSpaceResponse PacketType = 0x08
 )
 
 type Packet struct {

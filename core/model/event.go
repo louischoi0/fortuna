@@ -320,7 +320,16 @@ func (event *Event) Hash() string {
 	return crypto.SHA256(buf.String())
 }
 
-func NewEventRequest(publisher string, spaceID string, payload *structure.OrderedMap, spec *EventSpec, topic string, subtopic string, tag string) *Event {
+func NewEventRequest(publisher string, spaceID string, payload *structure.OrderedMap, spec *EventSpec, topic string, subtopic string, tag string) (*Event, error) {
+
+	if len(publisher) != C.IDENTITY_ADDRESS_STR_LENGTH {
+		return nil, fmt.Errorf("publisher must have length: %d", C.IDENTITY_ADDRESS_STR_LENGTH)
+	}
+
+	if len(spaceID) != C.SPACE_ID_STR_LENGTH {
+		return nil, fmt.Errorf("spaceID must have length: %d", C.SPACE_ID_STR_LENGTH)
+	}
+
 	return &Event{
 		Publisher: publisher,
 		SpaceID:   spaceID,
@@ -329,7 +338,7 @@ func NewEventRequest(publisher string, spaceID string, payload *structure.Ordere
 		Topic:     topic,
 		Subtopic:  subtopic,
 		Tag:       tag,
-	}
+	}, nil
 }
 
 func (event *Event) Buffer() []byte {
@@ -356,10 +365,6 @@ func (event *Event) Map() *structure.OrderedMap {
 }
 
 func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
-	timestamp, ok := data.Int64("timestamp")
-	if !ok {
-		return nil, fmt.Errorf("event data must have key:timestamp")
-	}
 
 	publisher, ok := data.String("publisher")
 	if !ok {
@@ -379,6 +384,10 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 	spaceID, ok := data.Get("space_id")
 	if !ok {
 		return nil, fmt.Errorf("event data must have key:space_id")
+	}
+
+	if len(spaceID.(string)) != C.SPACE_ID_STR_LENGTH {
+		return nil, fmt.Errorf("spaceID must have length: %d", C.SPACE_ID_STR_LENGTH)
 	}
 
 	spaceID_s, ok := spaceID.(string)
@@ -418,7 +427,7 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 	}
 
 	event := Event{
-		Timestamp: uint64(timestamp),
+		Timestamp: util.GetCurrentTime(),
 		Publisher: publisher,
 		SpaceID:   spaceID_s,
 		Spec:      spec,

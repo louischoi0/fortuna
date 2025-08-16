@@ -121,6 +121,7 @@ type Space struct {
 	mu      sync.Mutex
 	SpaceID string
 
+	CurrentPage *Page
 	LastPage    *Page
 	LastPageNum uint64
 	Pages       []*Page
@@ -143,8 +144,12 @@ func NewSpace(spaceID string) *Space {
 		log.Fatalf("failed to get space meta db: %v", err.Error())
 	}
 
+	page := NewPage(spaceID, 1, nil)
+
 	return &Space{
+		CurrentPage: page,
 		LastPageNum: 0,
+		LastPage:    nil,
 		SpaceID:     spaceID,
 		meta:        metaDB,
 		Storage:     storage,
@@ -205,11 +210,11 @@ func (s *Space) CommitPage(page *Page) error {
 	defer s.mu.Unlock()
 
 	if pn := s.ReadLastPageNum(); pn != s.LastPageNum {
-		return fmt.Errorf("space height mismatch expected %v, but %v", s.LastPageNum, pn)
+		return fmt.Errorf("space last page num mismatch expected %v, but %v", s.LastPageNum, pn)
 	}
 
 	if s.LastPageNum+1 != page.GetPageNum() {
-		return fmt.Errorf("height %v is exepcted not %v", s.LastPageNum+1, page.GetPageNum())
+		return fmt.Errorf("last page num mismatch expected %v, but %v", s.LastPageNum+1, page.GetPageNum())
 	}
 
 	if page.GetPageNum() != 1 && s.LastPage != nil && s.LastPage.Hash() != page.PrevPageHash {
@@ -247,7 +252,9 @@ func (s *Space) CommitPage(page *Page) error {
 		return err
 	}
 
-	s.LastPage = page
+	s.LastPage = s.CurrentPage
+	s.LastPageNum++
+	s.CurrentPage = page
 	s.LastAppendedAt = time.Now()
 
 	return nil
@@ -256,13 +263,13 @@ func (s *Space) CommitPage(page *Page) error {
 func (s *Space) GetPage(num uint64) (*Page, error) {
 
 	if int(num) > len(s.Pages)+1 {
-		return nil, fmt.Errorf("page not found for height: %v", num)
+		return nil, fmt.Errorf("page not found for %v", num)
 	}
 
 	page := s.Pages[num-1]
 
 	if page.GetPageNum() != num {
-		log.Fatalf("page invalid error page expected height: %v, but %v", page.GetPageNum(), num)
+		log.Fatalf("page invalid error page expected num: %v, but %v", page.GetPageNum(), num)
 	}
 
 	return page, nil
@@ -327,7 +334,7 @@ func (s *Space) WritePageIndex(pageIndex *PageIndex) error {
 	}
 
 	rock.SetValue(s.meta, key, pageIndexBytes)
-	log.Printf("write page index at height %v - size:%v offset: %v buffer_size: %v", pageIndex.PageNum, pageIndex.Size, pageIndex.Offset, len(pageIndexBytes))
+	log.Printf("write page index at num %v - size:%v offset: %v buffer_size: %v", pageIndex.PageNum, pageIndex.Size, pageIndex.Offset, len(pageIndexBytes))
 	return nil
 }
 
@@ -342,7 +349,7 @@ func (s *Space) SetCurrentFile(file *storage.File) error {
 }
 
 func (s *Space) SetPageNum(pageNum uint64) error {
-	err := rock.SetValue(s.meta, "height", []byte(util.EncodeUint64(pageNum)))
+	err := rock.SetValue(s.meta, "page_num", []byte(util.EncodeUint64(pageNum)))
 	if err != nil {
 		return err
 	}
@@ -351,7 +358,7 @@ func (s *Space) SetPageNum(pageNum uint64) error {
 }
 
 func (s *Space) ReadLastPageNum() uint64 {
-	pageNum, err := rock.GetValue(s.meta, "height")
+	pageNum, err := rock.GetValue(s.meta, "page_num")
 	if err != nil {
 		return 0
 	}
@@ -363,7 +370,7 @@ func (s *Space) ReadLastPageNum() uint64 {
 	return pn
 }
 
-func (s *Space) GetHeight() uint64 {
+func (s *Space) GetPageNum() uint64 {
 	return s.LastPageNum
 }
 
@@ -371,7 +378,7 @@ func (s *Space) Next() uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	log.Printf("next height: %v", s.LastPageNum+1)
+	log.Printf("next num: %v", s.LastPageNum+1)
 
 	return s.LastPageNum + 1
 }

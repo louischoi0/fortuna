@@ -13,9 +13,8 @@ type ResetStateSignal struct {
 }
 
 type StateMachine struct {
-	ID         string
-	SpaceID    string
-	LastHeight int64
+	ID      string
+	SpaceID string
 
 	State      *model.StateVector
 	StateSeed  string

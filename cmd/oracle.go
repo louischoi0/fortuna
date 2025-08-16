@@ -11,6 +11,29 @@ import (
 
 const CLI_DEFAULT_ENDPOINT = "localhost:4277"
 
+func CreateOracleListSpacesCMD() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "spaces",
+		Short: "list all spaces",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			endpoint, _ := cmd.Flags().GetString("endpoint")
+			request := rpc.NewRawRequest(endpoint, swift.PacketTypeOracleGETSpaceRequest, `""`)
+			response, err := request.Call()
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+
+			buffer := swift.FormatJSONResponse(response.Payload)
+			log.Println(buffer)
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringP("endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint")
+	return cmd
+}
+
 func CreatePingRequestCMD() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ping",
@@ -30,7 +53,7 @@ func CreatePingRequestCMD() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("endpoint", "e", "0.0.0.0:4277", "endpoint")
+	cmd.Flags().StringP("endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint")
 	return cmd
 }
 
@@ -40,24 +63,29 @@ func CreateOracleStartCmd() *cobra.Command {
 		Use:   "run",
 		Short: "",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			workspace, _ := cmd.Flags().GetString("workspace")
+			spaceID, _ := cmd.Flags().GetString("space_id")
 			port, _ := cmd.Flags().GetInt("port")
 
-			oracle := service.GetOracleService(workspace, service.OracleConfig{
+			oracle := service.GetOracleService(spaceID, service.OracleConfig{
 				MaxEventRequestsPerMinute: 1000,
 				EventBufferSize:           1000,
 				TransactionBufferSize:     1000,
 			})
 
-			oracle.StartUp()
-			oracle.Run(port)
+			if err := oracle.Bootstrap(); err != nil {
+				log.Fatalf("Failed to bootstrap: %v", err.Error())
+			}
+
+			if err := oracle.Run(port); err != nil {
+				log.Fatalf("Failed to run: %v", err.Error())
+			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().StringP("workspace", "w", "abcd", "")
-	cmd.Flags().IntP("port", "p", 4277, "")
+	cmd.Flags().StringP("space_id", "s", DEFAULT_SPACE_ID, "space id")
+	cmd.Flags().IntP("port", "p", 4277, "port")
 	return cmd
 }
 
@@ -69,6 +97,7 @@ func CreateOracleCMD() *cobra.Command {
 
 	cmd.AddCommand(CreateOracleStartCmd())
 	cmd.AddCommand(CreatePingRequestCMD())
+	cmd.AddCommand(CreateOracleListSpacesCMD())
 
 	return cmd
 }

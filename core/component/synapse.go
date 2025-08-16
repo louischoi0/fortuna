@@ -80,7 +80,7 @@ func (n *Synapse) Init() {
 
 }
 
-func (n *Synapse) Run() error {
+func (n *Synapse) Bootstrap() error {
 	if err := n.InitMachines(); err != nil {
 		log.Fatalf("Failed to init synapse: %v", err.Error())
 	}

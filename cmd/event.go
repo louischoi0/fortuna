@@ -3,12 +3,16 @@ package cmd
 import (
 	"fmt"
 	"fortuna/core/model"
+	"fortuna/core/vm"
 	"fortuna/rpc"
 	"fortuna/structure"
 	"log"
 
 	"github.com/spf13/cobra"
 )
+
+const DEFAULT_SPACE_ID = "0000000000000000000000000000000000000000000000000000000000000000"
+const DEFAULT_PUBLISHER = "0000000000000000000000000000000000000000000000000000000000000000"
 
 func CreateEventVerifyCMD() *cobra.Command {
 	var event_payload string
@@ -73,7 +77,11 @@ func CreateEventEmitCMD() *cobra.Command {
 			payload.Set("a", 3)
 
 			spec := model.NewEventSpec(interface_id, kernel_version, params)
-			event := model.NewEventRequest(publisher, space_id, payload, spec, topic, subtopic, tag)
+			event, err := model.NewEventRequest(publisher, space_id, payload, spec, topic, subtopic, tag)
+
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
 
 			request := rpc.CreateEventRequest(endpoint, event, auth)
 
@@ -89,15 +97,14 @@ func CreateEventEmitCMD() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&space_id, "space_id", "s", "", "space id")
-	cmd.Flags().StringVarP(&interface_id, "interface_id", "i", "FIC_001", "interface id")
-	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base-v0.0.0", "interface id")
-
+	cmd.Flags().StringVarP(&space_id, "space_id", "s", DEFAULT_SPACE_ID, "space id")
+	cmd.Flags().StringVarP(&interface_id, "interface_id", "i", string(vm.FIC__001), "interface id")
+	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", string(vm.BaseV000), "kernel version")
 	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
 	cmd.Flags().StringVarP(&topic, "topic", "t", "", "topic")
 	cmd.Flags().StringVarP(&subtopic, "subtopic", "c", "", "subtopic")
 	cmd.Flags().StringVarP(&tag, "tag", "g", "", "tag")
-	cmd.Flags().StringVarP(&publisher, "publisher", "p", "", "publisher")
+	cmd.Flags().StringVarP(&publisher, "publisher", "p", DEFAULT_PUBLISHER, "publisher")
 
 	return cmd
 }

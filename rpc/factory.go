@@ -7,7 +7,6 @@ import (
 	"fortuna/core/model"
 	"fortuna/swift"
 	"io"
-	"log"
 	"net"
 	"time"
 )
@@ -52,7 +51,6 @@ func CreateRequest(packetType swift.PacketType, peer, payload string) *RawReques
 }
 
 func CreateEventRequest(peer string, event *model.Event, authorization string) *RawRequest {
-	log.Print("event payload: ", event.String())
 	req := RawRequest{
 		Type:    swift.PacketTypeEmitEventRequest,
 		Payload: event.String(),

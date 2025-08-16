@@ -16,7 +16,7 @@ type StateKernel interface {
 	GenVector(seed string, size int64) *model.StateVector
 	VerifyVector(seed string, vector *model.StateVector) bool
 	RandInt(seed string, minValue int64, maxValue int64) int64
-	GenIndex(seed string, minValue int64, maxValue int64, size int64) []int64
+	GenIndex(seed string, minValue int64, maxValue int64, size uint64) []uint64
 
 	GenStateSeed() (string, string)
 	GenStateSeedPayload(payload string) string
@@ -70,15 +70,16 @@ func (ck *BasicStateKernel) VerifyVector(seed string, vec *model.StateVector) bo
 	return true
 }
 
-func (ck *BasicStateKernel) GenIndex(seed string, s int64, e int64, size int64) []int64 {
-	res := make([]int64, size)
+func (ck *BasicStateKernel) GenIndex(seed string, s int64, e int64, size uint64) []uint64 {
+	res := make([]uint64, size)
 
 	seed_bytes := []byte(seed)
 	rng := crypto.NewCSPRNG(seed_bytes)
 
 	for i := range size {
 		v := rng.NextInt64()
-		res[i] = (v % e) + s
+		// TODO: check if v is negative
+		res[i] = uint64((v % e) + s)
 	}
 	return res
 }
