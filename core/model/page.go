@@ -239,7 +239,18 @@ func DecodePage(b []byte) (*Page, error) {
 		return nil, fmt.Errorf("read previous hash: %w", err)
 	}
 
-	// 4. event count and tx count
+	// 4. root hashes
+	txRootHash, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read transaction root hash: %w", err)
+	}
+
+	execRootHash, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read execution root hash: %w", err)
+	}
+
+	// 5. event count and tx count
 	eventCountU, err := readU64LE()
 	if err != nil {
 		return nil, fmt.Errorf("read event count: %w", err)
@@ -293,11 +304,13 @@ func DecodePage(b []byte) (*Page, error) {
 	}
 
 	page := &Page{
-		N:            pageNum,
-		Timestamp:    ts,
-		PrevPageHash: prevHash,
-		Executions:   events,
-		Transactions: txs,
+		N:                   pageNum,
+		Timestamp:           ts,
+		PrevPageHash:        prevHash,
+		TransactionRootHash: txRootHash,
+		ExecutionRootHash:   execRootHash,
+		Executions:          events,
+		Transactions:        txs,
 	}
 
 	page.UpdateExecutionRoot()

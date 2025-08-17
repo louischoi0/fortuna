@@ -5,7 +5,6 @@ import (
 	"fortuna/core/component"
 	"fortuna/core/model"
 	"fortuna/rock"
-	"fortuna/structure"
 	"fortuna/swift"
 	"log"
 	"sync"
@@ -30,8 +29,6 @@ type Oracle struct {
 	universe *grocksdb.DB
 
 	Universe map[string]*model.Space
-
-	priorityQueue *structure.PriorityQueue
 
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction

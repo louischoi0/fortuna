@@ -103,7 +103,6 @@ func SetValue(db *grocksdb.DB, key string, value []byte) error {
 func GetValue(db *grocksdb.DB, key string) ([]byte, error) {
 	readOpts := grocksdb.NewDefaultReadOptions()
 	defer readOpts.Destroy()
-	log.Printf("rock get - key: %s", key)
 
 	value, err := db.Get(readOpts, []byte(key))
 
@@ -112,7 +111,7 @@ func GetValue(db *grocksdb.DB, key string) ([]byte, error) {
 	}
 
 	data := value.Data()
-	defer value.Free() 
+	defer value.Free()
 
 	ret := make([]byte, len(data))
 	copy(ret, data)

@@ -144,6 +144,21 @@ func NewSpace(spaceID string) *Space {
 		log.Fatalf("failed to get space meta db: %v", err.Error())
 	}
 
+	pageNum, err := ReadLastPageNum(metaDB)
+	if err != nil {
+		log.Fatalf("failed to get last page num: %v", err.Error())
+	}
+
+	if pageNum != 0 {
+		space := &Space{
+			SpaceID: spaceID,
+			Storage: storage,
+			meta:    metaDB,
+		}
+		space.LoadSpaceData()
+		return space
+	}
+
 	page := NewPage(spaceID, 1, nil)
 
 	return &Space{
@@ -159,7 +174,6 @@ func NewSpace(spaceID string) *Space {
 func (s *Space) LoadSpaceData() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	pageNum := s.ReadLastPageNum()
 	s.LastPageNum = pageNum
 
@@ -172,13 +186,17 @@ func (s *Space) LoadSpaceData() error {
 	for i := uint64(1); i <= s.LastPageNum; i++ {
 		blk, err := s.ReadPage(i)
 		if err != nil {
-			return err
+			log.Fatalf("failed to read page %v: %v", i, err.Error())
 		}
 		s.Pages = append(s.Pages, blk)
 	}
 
 	if s.LastPageNum > 0 {
-		s.LastPage = s.Pages[s.LastPageNum-1]
+		s.CurrentPage = s.Pages[s.LastPageNum-1]
+	}
+
+	if s.LastPageNum > 1 {
+		s.LastPage = s.Pages[s.LastPageNum-2]
 	}
 
 	return nil
@@ -286,17 +304,17 @@ func (s *Space) Reset() error {
 	return nil
 }
 
-func (s *Space) ReadPage(num uint64) (*Page, error) {
-	pageIndex, err := s.ReadPageIndex(num)
+func ReadPage(db *grocksdb.DB, storage *storage.FileStorage, num uint64) (*Page, error) {
+	pageIndex, err := ReadPageIndex(db, num)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PageIndex: %v", err.Error())
 	}
 
 	blockNum := pageIndex.BlockNum
 	fileName := GetFileName(blockNum)
-	file := s.Storage.GetOrOpenFile(fileName)
+	file := storage.GetOrOpenFile(fileName)
 
-	fmt.Printf("offset: %v size: %v", pageIndex.Offset, pageIndex.Size)
+	log.Printf("read page %v offset: %v size: %v", num, pageIndex.Offset, pageIndex.Size)
 
 	pageBytes, err := file.OffsetRead(int64(pageIndex.Offset), int64(pageIndex.Size))
 	if err != nil {
@@ -311,9 +329,13 @@ func (s *Space) ReadPage(num uint64) (*Page, error) {
 	return page, nil
 }
 
-func (s *Space) ReadPageIndex(pageNum uint64) (*PageIndex, error) {
-	key := fmt.Sprintf(C.PAGE_INDEX_KEY_FORMAT, pageNum)
-	value, err := rock.GetValue(s.meta, key)
+func (s *Space) ReadPage(num uint64) (*Page, error) {
+	return ReadPage(s.meta, s.Storage, num)
+}
+
+func ReadPageIndex(db *grocksdb.DB, num uint64) (*PageIndex, error) {
+	key := fmt.Sprintf(C.PAGE_INDEX_KEY_FORMAT, num)
+	value, err := rock.GetValue(db, key)
 	if err != nil {
 		return nil, err
 	}
@@ -324,6 +346,10 @@ func (s *Space) ReadPageIndex(pageNum uint64) (*PageIndex, error) {
 	}
 
 	return pageIndex, nil
+}
+
+func (s *Space) ReadPageIndex(pageNum uint64) (*PageIndex, error) {
+	return ReadPageIndex(s.meta, pageNum)
 }
 
 func (s *Space) WritePageIndex(pageIndex *PageIndex) error {
@@ -357,17 +383,31 @@ func (s *Space) SetPageNum(pageNum uint64) error {
 	return nil
 }
 
-func (s *Space) ReadLastPageNum() uint64 {
-	pageNum, err := rock.GetValue(s.meta, "page_num")
+func ReadLastPageNum(db *grocksdb.DB) (uint64, error) {
+	pageNum, err := rock.GetValue(db, "page_num")
 	if err != nil {
-		return 0
+		return 0, err
+	}
+
+	if len(pageNum) == 0 {
+		return 0, nil
 	}
 
 	pn, err := util.DecodeUint64(pageNum)
 	if err != nil {
+		return 0, err
+	}
+
+	return pn, nil
+}
+
+func (s *Space) ReadLastPageNum() uint64 {
+	pageNum, err := ReadLastPageNum(s.meta)
+	if err != nil {
 		return 0
 	}
-	return pn
+
+	return pageNum
 }
 
 func (s *Space) GetPageNum() uint64 {
