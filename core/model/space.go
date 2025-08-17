@@ -123,7 +123,6 @@ type Space struct {
 
 	CurrentPage *Page
 	LastPage    *Page
-	LastPageNum uint64
 	Pages       []*Page
 
 	Storage *storage.FileStorage
@@ -163,7 +162,6 @@ func NewSpace(spaceID string) *Space {
 
 	return &Space{
 		CurrentPage: page,
-		LastPageNum: 0,
 		LastPage:    nil,
 		SpaceID:     spaceID,
 		meta:        metaDB,
@@ -172,18 +170,15 @@ func NewSpace(spaceID string) *Space {
 }
 
 func (s *Space) LoadSpaceData() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	pageNum := s.ReadLastPageNum()
-	s.LastPageNum = pageNum
 
-	log.Printf("loading space data for %s, last page num: %v", s.SpaceID, s.LastPageNum)
+	log.Printf("loading space data for %s, last page num: %v", s.SpaceID, pageNum)
 
 	if len(s.Pages) != 0 {
 		return fmt.Errorf("space loaded again")
 	}
 
-	for i := uint64(1); i <= s.LastPageNum; i++ {
+	for i := uint64(1); i <= pageNum; i++ {
 		blk, err := s.ReadPage(i)
 		if err != nil {
 			log.Fatalf("failed to read page %v: %v", i, err.Error())
@@ -191,13 +186,11 @@ func (s *Space) LoadSpaceData() error {
 		s.Pages = append(s.Pages, blk)
 	}
 
-	if s.LastPageNum > 0 {
-		s.CurrentPage = s.Pages[s.LastPageNum-1]
+	if pageNum > 0 {
+		s.LastPage = s.Pages[pageNum-1]
 	}
 
-	if s.LastPageNum > 1 {
-		s.LastPage = s.Pages[s.LastPageNum-2]
-	}
+	s.CurrentPage = NewPage(s.SpaceID, pageNum+1, s.LastPage)
 
 	return nil
 }
@@ -223,16 +216,23 @@ func (s *Space) IsFileSizeExceed(f *storage.File) bool {
 	return f.GetSize() >= C.PAGE_FILE_SIZE
 }
 
-func (s *Space) CommitPage(page *Page) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if pn := s.ReadLastPageNum(); pn != s.LastPageNum {
-		return fmt.Errorf("space last page num mismatch expected %v, but %v", s.LastPageNum, pn)
+func (s *Space) MaybeCommitPage() error {
+	if s.CurrentPage == nil {
+		log.Fatalf("space %s current page is nil", s.SpaceID)
 	}
 
-	if s.LastPageNum+1 != page.GetPageNum() {
-		return fmt.Errorf("last page num mismatch expected %v, but %v", s.LastPageNum+1, page.GetPageNum())
+	if s.CurrentPage.GetCount() < C.PAGE_MIN_EVENT_COUNT {
+		return nil
+	}
+
+	return s.CommitCurrentPage()
+}
+
+func (s *Space) CommitCurrentPage() error {
+	page := s.CurrentPage
+
+	if s.ReadLastPageNum() != page.GetPageNum()-1 {
+		return fmt.Errorf("space last page num mismatch expected %v, but %v", page.GetPageNum()-1, s.ReadLastPageNum())
 	}
 
 	if page.GetPageNum() != 1 && s.LastPage != nil && s.LastPage.Hash() != page.PrevPageHash {
@@ -243,6 +243,10 @@ func (s *Space) CommitPage(page *Page) error {
 	}
 	if page.GetPageNum() > 1 && s.LastPage == nil {
 		return fmt.Errorf("last block is nil")
+	}
+
+	if s.LastPage != nil && s.LastPage.GetPageNum() != page.GetPageNum()-1 {
+		return fmt.Errorf("last page num mismatch expected %v, but %v", s.LastPage.GetPageNum(), page.GetPageNum()-1)
 	}
 
 	if s.CurrentFile == nil || s.IsFileSizeExceed(s.CurrentFile) {
@@ -270,9 +274,8 @@ func (s *Space) CommitPage(page *Page) error {
 		return err
 	}
 
-	s.LastPage = s.CurrentPage
-	s.LastPageNum++
-	s.CurrentPage = page
+	s.LastPage = page
+	s.CurrentPage = NewPage(s.SpaceID, page.GetPageNum()+1, s.LastPage)
 	s.LastAppendedAt = time.Now()
 
 	return nil
@@ -379,7 +382,6 @@ func (s *Space) SetPageNum(pageNum uint64) error {
 	if err != nil {
 		return err
 	}
-	s.LastPageNum = pageNum
 	return nil
 }
 
@@ -408,19 +410,6 @@ func (s *Space) ReadLastPageNum() uint64 {
 	}
 
 	return pageNum
-}
-
-func (s *Space) GetPageNum() uint64 {
-	return s.LastPageNum
-}
-
-func (s *Space) Next() uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	log.Printf("next num: %v", s.LastPageNum+1)
-
-	return s.LastPageNum + 1
 }
 
 func (s *Space) SetMetaDB(meta *grocksdb.DB) {

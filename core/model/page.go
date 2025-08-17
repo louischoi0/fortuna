@@ -6,6 +6,7 @@ import (
 	"fortuna/crypto"
 	"fortuna/structure"
 	"fortuna/util"
+	"log"
 	"strings"
 	"sync"
 
@@ -63,6 +64,7 @@ func (page *Page) AppendTransactionExecution(tx *Transaction) {
 }
 
 func (page *Page) AppendEventExecution(er *EventResult) {
+	log.Printf("append event execution for page %v: %v", page.N, er.Event.Hash())
 	page.mu.Lock()
 	defer page.mu.Unlock()
 

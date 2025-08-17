@@ -111,14 +111,6 @@ func GetOracleService(spaceID string, config OracleConfig) *Oracle {
 	return oracle
 }
 
-func (o *Oracle) VerifyPage(page *model.Page) error {
-	return nil
-}
-
-func (o *Oracle) VerifyEventResult(event *model.EventResult) error {
-	return nil
-}
-
 func (o *Oracle) Daemon() error {
 	log.Printf("oracle daemon started")
 
@@ -138,19 +130,11 @@ func (o *Oracle) Daemon() error {
 
 			space.CurrentPage.AppendEventExecution(event)
 
-			if o.ShouldCommitPage(space.CurrentPage) {
-				err = o.CommitPage(space.CurrentPage)
-				if err != nil {
-					log.Fatalf("failed to commit page: %v", err.Error())
-				}
+			if err := space.MaybeCommitPage(); err != nil {
+				log.Fatalf("failed to commit page: %v", err.Error())
 			}
 		}
 	}
-}
-
-func (o *Oracle) ShouldCommitPage(page *model.Page) bool {
-	log.Println("should commit page: ", page.GetCount())
-	return page.GetCount() > 3
 }
 
 func (o *Oracle) GetSpace(spaceID string) (*model.Space, error) {
@@ -160,22 +144,6 @@ func (o *Oracle) GetSpace(spaceID string) (*model.Space, error) {
 	}
 
 	return u, nil
-}
-
-func (o *Oracle) CommitPage(page *model.Page) error {
-
-	if err := o.VerifyPage(page); err != nil {
-		return err
-	}
-
-	space := o.Universe[o.spaceID]
-
-	err := space.CommitPage(page)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (o *Oracle) Shutdown() error {
