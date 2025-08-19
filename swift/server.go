@@ -23,6 +23,8 @@ type TCPServer struct {
 	port    int
 	address string
 
+	onOpenCallbacks	[]func(net.Conn)
+
 	mu sync.RWMutex
 }
 
@@ -52,12 +54,29 @@ func (s *TCPServer) Start(port int) error {
 	return nil
 }
 
+func (s *TCPServer) AddOnOpenCallback(cb func(net.Conn)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onOpenCallbacks = append(s.onOpenCallbacks, cb)
+}
+
+type connKey	struct{}
+
+func (s *TCPServer) WithConnection(ctx context.Context, conn net.Conn) context.Context {
+	return context.WithValue(ctx, connKey{}, conn)
+}
+
 func (s *TCPServer) acceptConnections() {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			continue
 		}
+
+		for _, cb := range s.onOpenCallbacks {
+			go cb(conn)
+		}
+
 		go s.HandleConnection(conn)
 	}
 }

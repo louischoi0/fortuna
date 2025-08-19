@@ -15,6 +15,12 @@ import (
 func (o *Oracle) RegisterHandlers() error {
 	log.Printf("registering oracle handlers")
 
+	o.swift.RegisterHandler(swift.PacketTypeReplicaConnectRequest, func(ctx context.Context, packet *swift.Packet) error {
+
+
+		return nil
+	})
+
 	o.swift.RegisterHandler(swift.PacketTypeGenVectorRequest, func(ctx context.Context, packet *swift.Packet) error {
 		omap, err := structure.ParseOrderedMap(string(packet.Payload))
 		if err != nil {

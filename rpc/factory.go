@@ -60,6 +60,14 @@ func CreateEventRequest(peer string, event *model.Event, authorization string) *
 	return &req
 }
 
+func Connect(target string) (net.Conn, error) {
+	conn, err := net.DialTimeout("tcp", target, 3*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
 func CallRPC(targetNode string, packet swift.Packet) (swift.Packet, error) {
 	nullpacket := swift.Packet{}
 	conn, err := net.DialTimeout("tcp", targetNode, 3*time.Second)

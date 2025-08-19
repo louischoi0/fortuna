@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"fortuna/structure"
+	"encoding/base64"
+	"crypto/rand"
 )
 
 func EncodeInt64Array(arr []int64) []byte {
@@ -393,3 +395,13 @@ func UnpadLeftS(s string) string {
 	}
 	return string(b[i:])
 }
+
+func RandomBase64(l int) (string, error) {
+	b := make([]byte, l)
+       	if _, err := rand.Read(b); err != nil {
+           	return "", err
+       	}
+
+       	return base64.RawStdEncoding.EncodeToString(b), nil
+}
+

@@ -63,10 +63,11 @@ func CreateOracleStartCmd() *cobra.Command {
 		Use:   "run",
 		Short: "",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			nodeID, _ := cmd.Flags().GetString("node_id")
 			spaceID, _ := cmd.Flags().GetString("space_id")
 			port, _ := cmd.Flags().GetInt("port")
 
-			oracle := service.GetOracleService(spaceID, service.OracleConfig{
+			oracle := service.GetOracleService(nodeID, spaceID, service.OracleConfig{
 				MaxEventRequestsPerMinute: 1000,
 				EventBufferSize:           1000,
 				TransactionBufferSize:     1000,
@@ -84,6 +85,7 @@ func CreateOracleStartCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringP("node_id", "i", "this is node", "space id")
 	cmd.Flags().StringP("space_id", "s", DEFAULT_SPACE_ID, "space id")
 	cmd.Flags().IntP("port", "p", 4277, "port")
 	return cmd

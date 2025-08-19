@@ -6,9 +6,11 @@ import (
 	"fortuna/core/model"
 	"fortuna/rock"
 	"fortuna/swift"
+	"fortuna/util"
 	"log"
 	"sync"
 
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -22,19 +24,31 @@ const TRANSACTION_BUFFER_SIZE = 1024
 var oracleOnce sync.Once
 var oracle *Oracle
 
+type replicaInfo struct {
+	ID		string
+	conn		net.Conn
+}
+
+func NewReplicaInfo(rid string, conn net.Conn) replicaInfo {
+	return replicaInfo{
+		ID: rid,
+		conn: conn,
+	}
+}
+
 type Oracle struct {
-	mu sync.Mutex
+	mu 		sync.Mutex
 
-	spaceID  string
-	universe *grocksdb.DB
-
-	Universe map[string]*model.Space
+	dbs	 	map[string]*grocksdb.DB
+	Universe 	map[string]*model.Space
 
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction
 
-	swift    *swift.TCPServer
-	synapses map[string]*component.Synapse
+	swift    	*swift.TCPServer
+	synapses 	map[string]*component.Synapse
+
+	replicas	map[string]replicaInfo
 }
 
 type OracleConfig struct {
@@ -65,7 +79,13 @@ func (o *Oracle) AllocateSpace(spaceID string) (*model.Space, error) {
 		return nil, fmt.Errorf("failed to bootstrap synapse: %v", err.Error())
 	}
 
+	db, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
+	if err != nil {
+		log.Fatalf("failed to get rocks db: %v", err.Error())
+	}
+
 	o.synapses[spaceID] = syn
+	o.dbs[spaceID] = db
 
 	return space, nil
 }
@@ -79,30 +99,20 @@ func (o *Oracle) ListSpaces() ([]string, error) {
 	return spaces, nil
 }
 
-func GetOracleService(spaceID string, config OracleConfig) *Oracle {
+func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleConfig) *Oracle {
 	oracleOnce.Do(func() {
-		universeDB, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
-		if err != nil {
-			log.Fatalf("failed to get universe db: %v", err.Error())
-		}
-
-		if err != nil {
-			log.Fatalf("failed to load space data: %v", err.Error())
-		}
-
 		swift := swift.NewServer()
 
 		oracle = &Oracle{
-			spaceID:           spaceID,
 			eventBuffer:       make(chan *model.EventResult, EVENT_BUFFER_SIZE),
 			transactionBuffer: make(chan *model.Transaction, TRANSACTION_BUFFER_SIZE),
-			universe:          universeDB,
+			dbs:         	   make(map[string]*grocksdb.DB), 
 			swift:             swift,
 			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
 		}
 
-		_, err = oracle.AllocateSpace(spaceID)
+		_, err := oracle.AllocateSpace(initialSpaceID)
 		if err != nil {
 			log.Fatalf("failed to allocate space: %v", err.Error())
 		}
@@ -155,6 +165,7 @@ func (o *Oracle) Shutdown() error {
 }
 
 func (o *Oracle) Run(port int) error {
+
 	if err := o.swift.Start(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err.Error())
 	}
@@ -173,3 +184,10 @@ func (o *Oracle) Run(port int) error {
 
 	return nil
 }
+
+func (o *Oracle) AddReplica(conn net.Conn) {
+	s, _ := util.RandomBase64(6)
+	rpi := NewReplicaInfo(s, conn)
+	o.replicas[rpi.ID] = rpi
+}
+

@@ -118,20 +118,17 @@ func NewPageIndex(spaceID string, pageNum uint64, blockNum uint64, offset uint64
 }
 
 type Space struct {
-	mu      sync.Mutex
-	SpaceID string
-
-	CurrentPage *Page
-	LastPage    *Page
-	Pages       []*Page
-
-	Storage *storage.FileStorage
-	meta    *grocksdb.DB
-
-	BlockNum    uint64
-	CurrentFile *storage.File
-
-	LastAppendedAt time.Time
+	mu      	sync.Mutex
+	SpaceID 	string
+	CurrentPage 	*Page
+	LastPage    	*Page
+	Pages       	[]*Page
+	Storage 	*storage.FileStorage
+	meta    	*grocksdb.DB
+	BlockNum    	uint64
+	CurrentFile 	*storage.File
+	LastAppendedAt 	time.Time
+	IsReplica 	bool
 }
 
 func NewSpace(spaceID string) *Space {
@@ -166,6 +163,7 @@ func NewSpace(spaceID string) *Space {
 		SpaceID:     spaceID,
 		meta:        metaDB,
 		Storage:     storage,
+		IsReplica:    false,
 	}
 }
 
@@ -229,6 +227,9 @@ func (s *Space) MaybeCommitPage() error {
 }
 
 func (s *Space) CommitCurrentPage() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	page := s.CurrentPage
 
 	if s.ReadLastPageNum() != page.GetPageNum()-1 {

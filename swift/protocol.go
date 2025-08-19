@@ -28,6 +28,9 @@ const (
 
 	PacketTypeOracleGETSpaceRequest  PacketType = 0x07
 	PacketTypeOracleGETSpaceResponse PacketType = 0x08
+
+	PacketTypeReplicaConnectRequest PacketType = 0x09
+	PacketTypeReplicaConnectResponse PacketType = 0x0a
 )
 
 type Packet struct {
