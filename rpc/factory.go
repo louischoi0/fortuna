@@ -40,6 +40,13 @@ func (req *RawRequest) Call() (swift.Packet, error) {
 	return CallRPC(req.Peer, packet)
 }
 
+func NewPingPacket(peer string) *swift.Packet {
+	return &swift.Packet{
+		Type:    swift.PacketTypePing,
+		Payload: "",
+	}
+}
+
 func CreateRequest(packetType swift.PacketType, peer, payload string) *RawRequest {
 	req := RawRequest{
 		Type:    packetType,
@@ -68,16 +75,7 @@ func Connect(target string) (net.Conn, error) {
 	return conn, nil
 }
 
-func CallRPC(targetNode string, packet swift.Packet) (swift.Packet, error) {
-	nullpacket := swift.Packet{}
-	conn, err := net.DialTimeout("tcp", targetNode, 3*time.Second)
-
-	if err != nil {
-		return nullpacket, fmt.Errorf("Failed to connect to server: %v", err)
-	}
-
-	defer conn.Close()
-
+func SendPacket(conn net.Conn, packet *swift.Packet) error {
 	packetData, err := json.Marshal(packet)
 	if err != nil {
 		return nullpacket, fmt.Errorf("Failed to serialize packet: %v", err)
@@ -97,10 +95,26 @@ func CallRPC(targetNode string, packet swift.Packet) (swift.Packet, error) {
 	if err := conn.SetReadDeadline(time.Now().Add(time.Second * 2)); err != nil {
 		return nullpacket, fmt.Errorf("Failed to set read deadline: %v", err)
 	}
+	return nil
+}
+
+func CallRPC(targetNode string, packet swift.Packet) (swift.Packet, error) {
+	nullpacket := swift.Packet{}
+	conn, err := net.DialTimeout("tcp", targetNode, 3*time.Second)
+
+	if err != nil {
+		return nullpacket, fmt.Errorf("Failed to connect to server: %v", err)
+	}
+
+	defer conn.Close()
+
 
 	respHeader := make([]byte, 4)
 	if _, err := io.ReadFull(conn, respHeader); err != nil {
 		return nullpacket, fmt.Errorf("Failed to read response header: %v", err)
+	}
+	if err := SendPacket(conn, packet); err != nil {
+		return nullpacket, err
 	}
 
 	respPacketLen := binary.LittleEndian.Uint32(respHeader)

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"log"
-
 	"github.com/spf13/cobra"
 )
 
@@ -22,8 +21,10 @@ func init() {
 	oracleCMD := CreateOracleCMD()
 	eventCMD := CreateEventCMD()
 	apiCMD := CreateAPICMD()
+	replicaCMD := CreateReplicaCMD()
 
 	rootCmd.AddCommand(oracleCMD)
 	rootCmd.AddCommand(eventCMD)
 	rootCmd.AddCommand(apiCMD)
+	rootCmd.AddCommand(replicaCMD)
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"fortuna/core/model"
 	"fortuna/rpc"
+	"fortuna/swift"
 	"sync"
 	"github.com/linxGnu/grocksdb"
 	"fmt"
@@ -22,35 +23,38 @@ type Replica struct {
 
 	conn		net.Conn
 	connected	bool
-	masterInfo	*nodeInfo
+
+	swift		*swift.TCPServer
 }
 
 func NewReplica() *Replica {
+	swift := swift.NewServer()
 	return &Replica{
+		swift: swift,
 		Universe: make(map[string]*model.Space),
 		connected: false,
 	}
 }
 
-type nodeInfo struct {
-	addr	string
-}
-
-func (rp *Replica) Connect(n *nodeInfo) error {
-	conn, err := rpc.Connect(n.addr)
+func (rp *Replica) Connect(addr string) error {
+	conn, err := rpc.Connect(addr)
 
 	if err != nil {
 		return err
 	}
 
+	log.Println("successfully connected")
 	rp.conn = conn
 	rp.connected = true
-	rp.masterInfo = n
 
 	return nil
 }
 
 func (rp *Replica) Run() error {
+	if !rp.connected {
+		log.Fatalf("replica not connected")
+	}
+
 	r := bufio.NewReader(rp.conn)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -77,7 +81,9 @@ func (rp *Replica) Run() error {
 		case err := <- done:
 			return err
 		case <- ping.C:
-			if _, err := fmt.Fprintln(rp.conn, "PING"); err != nil {
+			log.Println("ping")
+			if _, err := rp.conn.Write(; err != nil {
+				log.Fatalf(err.Error())
 				return err
 			}
 		}

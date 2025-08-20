@@ -12,25 +12,25 @@ import (
 type PacketType uint8
 
 const (
-	PacketTypeUnknown       PacketType = 0
-	PacketTypePing          PacketType = 1
-	PacketTypePong          PacketType = 2
-	PacketTypeErrorResponse PacketType = 9
 )
 
 const (
-	PacketTypeGenVectorRequest     PacketType = 0x01
-	PacketTypeStateSeedAPIRequest  PacketType = 0x02
-	PacketTypeEmitEventRequest     PacketType = 0x03
-	PacketTypeGenVectorResponse    PacketType = 0x04
-	PacketTypeStateSeedAPIResponse PacketType = 0x05
-	PacketTypeEmitEventResponse    PacketType = 0x06
+	PacketTypePing				PacketType = 0x00
+	PacketTypePong				PacketType = 0x10
+	PacketTypeErrorResponse 		PacketType = 0x0b
 
-	PacketTypeOracleGETSpaceRequest  PacketType = 0x07
-	PacketTypeOracleGETSpaceResponse PacketType = 0x08
+	PacketTypeGenVectorRequest     		PacketType = 0x01
+	PacketTypeStateSeedAPIRequest  		PacketType = 0x02
+	PacketTypeEmitEventRequest     		PacketType = 0x03
+	PacketTypeGenVectorResponse    		PacketType = 0x04
+	PacketTypeStateSeedAPIResponse 		PacketType = 0x05
+	PacketTypeEmitEventResponse    		PacketType = 0x06
 
-	PacketTypeReplicaConnectRequest PacketType = 0x09
-	PacketTypeReplicaConnectResponse PacketType = 0x0a
+	PacketTypeOracleGETSpaceRequest  	PacketType = 0x07
+	PacketTypeOracleGETSpaceResponse 	PacketType = 0x08
+
+	PacketTypeReplicaConnectRequest 	PacketType = 0x09
+	PacketTypeReplicaConnectResponse 	PacketType = 0x0a
 )
 
 type Packet struct {

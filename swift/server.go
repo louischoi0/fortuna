@@ -89,6 +89,8 @@ func (s *TCPServer) HandleConnection(conn net.Conn) error {
 	ctx := context.WithValue(context.Background(), "connection", conn)
 
 	for {
+		log.Println("received")
+
 		header := make([]byte, 4)
 		if _, err := io.ReadFull(conn, header); err != nil {
 			if err == io.EOF {

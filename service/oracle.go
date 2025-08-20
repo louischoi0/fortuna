@@ -37,18 +37,19 @@ func NewReplicaInfo(rid string, conn net.Conn) replicaInfo {
 }
 
 type Oracle struct {
-	mu 		sync.Mutex
+	mu 			sync.Mutex
 
-	dbs	 	map[string]*grocksdb.DB
-	Universe 	map[string]*model.Space
+	dbs	 		map[string]*grocksdb.DB
+	Universe 		map[string]*model.Space
 
-	eventBuffer       chan *model.EventResult
-	transactionBuffer chan *model.Transaction
+	eventBuffer       	chan *model.EventResult
+	transactionBuffer 	chan *model.Transaction
+	pageSignal		chan *model.Page
 
-	swift    	*swift.TCPServer
-	synapses 	map[string]*component.Synapse
+	swift    		*swift.TCPServer
+	synapses 		map[string]*component.Synapse
 
-	replicas	map[string]replicaInfo
+	replicas		map[string]replicaInfo
 }
 
 type OracleConfig struct {
@@ -143,6 +144,9 @@ func (o *Oracle) Daemon() error {
 			if err := space.MaybeCommitPage(); err != nil {
 				log.Fatalf("failed to commit page: %v", err.Error())
 			}
+		case <- o.pageSignal:
+			log.Println("todo broadcast page to replicas")
+
 		}
 	}
 }
