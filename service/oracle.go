@@ -7,6 +7,7 @@ import (
 	"fortuna/rock"
 	"fortuna/swift"
 	"fortuna/util"
+	"fortuna/rpc"
 	"log"
 	"sync"
 
@@ -25,7 +26,7 @@ var oracleOnce sync.Once
 var oracle *Oracle
 
 type replicaInfo struct {
-	ID		string
+	ID		string		`json:"id"`
 	conn		net.Conn
 }
 
@@ -56,6 +57,22 @@ type OracleConfig struct {
 	MaxEventRequestsPerMinute int64
 	EventBufferSize           int64
 	TransactionBufferSize     int64
+}
+
+type OracleStatus struct {
+	Status		string
+	Version		string
+	Replica 	map[string]replicaInfo `json:"replica"`
+}
+
+func (o *Oracle) GetOracleStatus() OracleStatus {
+	var res OracleStatus
+
+	res.Replica = o.replicas	
+	res.Status = "running"
+	res.Version = "v1.0.0"
+
+	return res
 }
 
 func (o *Oracle) GetSynapse(spaceID string) *component.Synapse {
@@ -111,6 +128,7 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 			swift:             swift,
 			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
+			replicas:	   make(map[string]replicaInfo),
 		}
 
 		_, err := oracle.AllocateSpace(initialSpaceID)
@@ -122,31 +140,74 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 	return oracle
 }
 
+func (o *Oracle) NewSyncPagePacket(page *model.Page) *swift.Packet {
+	buf, err := page.Encode()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
+	return &swift.Packet{
+		Type: swift.PacketTypeSyncPage,
+		Payload: buf,
+	}
+}
+
+func (o *Oracle) SyncPageReplica(replica replicaInfo, page *model.Page) error {
+	packet := o.NewSyncPagePacket(page)
+	return rpc.SendPacket(replica.conn, packet)
+}
+
+func (o *Oracle) FallbackSyncPage(replica replicaInfo, page *model.Page) error {
+	return nil
+}
+
+func (o *Oracle) SyncPageReplicas(page *model.Page) error {
+	for _, replica := range(o.replicas) {
+		err := o.SyncPageReplica(replica, page)
+		if err != nil {
+			o.FallbackSyncPage(replica, page)
+		}
+	}
+
+	return nil
+}
+
+func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
+	log.Println("process event result buffer: ", event.GetSpaceID())
+
+	space, err := o.GetSpace(event.GetSpaceID())
+	if err != nil {
+		log.Fatalf("failed to get space: %v", err.Error())
+	}
+
+	if space.CurrentPage == nil {
+		log.Fatalf("space %s has no current page", event.GetSpaceID())
+	}
+
+	space.CurrentPage.AppendEventExecution(event)
+
+	npage, err := space.MaybeCommitPage() 
+	if err != nil {
+		log.Fatalf("failed to commit page: %v", err.Error())
+	}
+
+	o.pageSignal <- npage
+
+
+	return nil
+}
+
 func (o *Oracle) Daemon() error {
 	log.Printf("oracle daemon started")
 
 	for {
 		select {
 		case event := <-o.eventBuffer:
-			log.Println("process event result buffer: ", event.GetSpaceID())
+			o.HandleEventResultBuffer(event)
 
-			space, err := o.GetSpace(event.GetSpaceID())
-			if err != nil {
-				log.Fatalf("failed to get space: %v", err.Error())
-			}
-
-			if space.CurrentPage == nil {
-				log.Fatalf("space %s has no current page", event.GetSpaceID())
-			}
-
-			space.CurrentPage.AppendEventExecution(event)
-
-			if err := space.MaybeCommitPage(); err != nil {
-				log.Fatalf("failed to commit page: %v", err.Error())
-			}
-		case <- o.pageSignal:
+		case npage := <-o.pageSignal:
 			log.Println("todo broadcast page to replicas")
-
+			o.SyncPageReplicas(npage)
 		}
 	}
 }

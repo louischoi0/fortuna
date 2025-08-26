@@ -31,7 +31,7 @@ func (raw *RawRequest) A(auth string) *RawRequest {
 	return raw
 }
 
-func (req *RawRequest) Call() (swift.Packet, error) {
+func (req *RawRequest) Call() (*swift.Packet, error) {
 	packet := swift.Packet{
 		Type:    req.Type,
 		Payload: json.RawMessage(req.Payload),
@@ -40,10 +40,17 @@ func (req *RawRequest) Call() (swift.Packet, error) {
 	return CallRPC(req.Peer, packet)
 }
 
-func NewPingPacket(peer string) *swift.Packet {
+func NewReplicaHandshakePacket() *swift.Packet {
+	return &swift.Packet{
+		Type:    swift.PacketTypeReplicaConnectRequest,
+		Payload: []byte(""),
+	}
+}
+
+func NewPingPacket() *swift.Packet {
 	return &swift.Packet{
 		Type:    swift.PacketTypePing,
-		Payload: "",
+		Payload: []byte(""),
 	}
 }
 
@@ -68,7 +75,7 @@ func CreateEventRequest(peer string, event *model.Event, authorization string) *
 }
 
 func Connect(target string) (net.Conn, error) {
-	conn, err := net.DialTimeout("tcp", target, 3*time.Second)
+	conn, err := net.DialTimeout("tcp", target, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +84,9 @@ func Connect(target string) (net.Conn, error) {
 
 func SendPacket(conn net.Conn, packet *swift.Packet) error {
 	packetData, err := json.Marshal(packet)
+
 	if err != nil {
-		return nullpacket, fmt.Errorf("Failed to serialize packet: %v", err)
+		return fmt.Errorf("Failed to serialize packet: %v", err)
 	}
 
 	packetLen := uint32(len(packetData))
@@ -86,53 +94,59 @@ func SendPacket(conn net.Conn, packet *swift.Packet) error {
 	binary.LittleEndian.PutUint32(header, packetLen)
 
 	if _, err := conn.Write(header); err != nil {
-		return nullpacket, fmt.Errorf("Failed to send header: %v", err)
+		return fmt.Errorf("Failed to send header: %v", err)
 	}
 	if _, err := conn.Write(packetData); err != nil {
-		return nullpacket, fmt.Errorf("Failed to send packet: %v", err)
-	}
-
-	if err := conn.SetReadDeadline(time.Now().Add(time.Second * 2)); err != nil {
-		return nullpacket, fmt.Errorf("Failed to set read deadline: %v", err)
+		return fmt.Errorf("Failed to send packet: %v", err)
 	}
 	return nil
 }
 
-func CallRPC(targetNode string, packet swift.Packet) (swift.Packet, error) {
+func ReadPacket(conn net.Conn) (*swift.Packet, error) {
 	nullpacket := swift.Packet{}
-	conn, err := net.DialTimeout("tcp", targetNode, 3*time.Second)
-
-	if err != nil {
-		return nullpacket, fmt.Errorf("Failed to connect to server: %v", err)
-	}
-
-	defer conn.Close()
-
-
 	respHeader := make([]byte, 4)
-	if _, err := io.ReadFull(conn, respHeader); err != nil {
-		return nullpacket, fmt.Errorf("Failed to read response header: %v", err)
+
+	if err := conn.SetReadDeadline(time.Now().Add(time.Second * 2)); err != nil {
+		return &nullpacket, fmt.Errorf("Failed to set read deadline: %v", err)
 	}
-	if err := SendPacket(conn, packet); err != nil {
-		return nullpacket, err
+
+	if _, err := io.ReadFull(conn, respHeader); err != nil {
+		return &nullpacket, fmt.Errorf("Failed to read response header: %v", err)
 	}
 
 	respPacketLen := binary.LittleEndian.Uint32(respHeader)
 
 	respData := make([]byte, respPacketLen)
 	if _, err := io.ReadFull(conn, respData); err != nil {
-		return nullpacket, fmt.Errorf("Failed to read response packet: %v", err)
+		return &nullpacket, fmt.Errorf("Failed to read response packet: %v", err)
 	}
 
 	var response swift.Packet
 	if err := json.Unmarshal(respData, &response); err != nil {
-		return nullpacket, fmt.Errorf("Invalid response format: %v", err)
+		return &nullpacket, fmt.Errorf("Invalid response format: %v", err)
 	}
 
-	return response, nil
+	return &response, nil
 }
 
-func CallRawRequest(request *RawRequest) (swift.Packet, error) {
+func CallRPC(targetNode string, packet swift.Packet) (*swift.Packet, error) {
+	nullpacket := swift.Packet{}
+	conn, err := net.DialTimeout("tcp", targetNode, 3*time.Second)
+
+	if err != nil {
+		return &nullpacket, fmt.Errorf("Failed to connect to server: %v", err)
+	}
+
+	defer conn.Close()
+
+	if err := SendPacket(conn, &packet); err != nil {
+		return &nullpacket, err
+	}
+
+	return ReadPacket(conn)
+}
+
+func CallRawRequest(request *RawRequest) (*swift.Packet, error) {
 	packet := swift.Packet{
 		Type:    request.Type,
 		Payload: json.RawMessage(request.Payload),

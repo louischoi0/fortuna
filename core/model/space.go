@@ -214,40 +214,41 @@ func (s *Space) IsFileSizeExceed(f *storage.File) bool {
 	return f.GetSize() >= C.PAGE_FILE_SIZE
 }
 
-func (s *Space) MaybeCommitPage() error {
+func (s *Space) MaybeCommitPage() (*Page, error) {
+
 	if s.CurrentPage == nil {
 		log.Fatalf("space %s current page is nil", s.SpaceID)
 	}
 
 	if s.CurrentPage.GetCount() < C.PAGE_MIN_EVENT_COUNT {
-		return nil
+		return nil, nil
 	}
 
 	return s.CommitCurrentPage()
 }
 
-func (s *Space) CommitCurrentPage() error {
+func (s *Space) CommitCurrentPage() (*Page, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	page := s.CurrentPage
 
 	if s.ReadLastPageNum() != page.GetPageNum()-1 {
-		return fmt.Errorf("space last page num mismatch expected %v, but %v", page.GetPageNum()-1, s.ReadLastPageNum())
+		return nil, fmt.Errorf("space last page num mismatch expected %v, but %v", page.GetPageNum()-1, s.ReadLastPageNum())
 	}
 
 	if page.GetPageNum() != 1 && s.LastPage != nil && s.LastPage.Hash() != page.PrevPageHash {
-		return fmt.Errorf("previous block hash mismatch expected %s not %s", s.LastPage.Hash(), page.PrevPageHash)
+		return nil, fmt.Errorf("previous block hash mismatch expected %s not %s", s.LastPage.Hash(), page.PrevPageHash)
 	}
 	if page.GetPageNum() == 1 && s.LastPage != nil {
-		return fmt.Errorf("first block must be genesis block")
+		return nil, fmt.Errorf("first block must be genesis block")
 	}
 	if page.GetPageNum() > 1 && s.LastPage == nil {
-		return fmt.Errorf("last block is nil")
+		return nil, fmt.Errorf("last block is nil")
 	}
 
 	if s.LastPage != nil && s.LastPage.GetPageNum() != page.GetPageNum()-1 {
-		return fmt.Errorf("last page num mismatch expected %v, but %v", s.LastPage.GetPageNum(), page.GetPageNum()-1)
+		return nil, fmt.Errorf("last page num mismatch expected %v, but %v", s.LastPage.GetPageNum(), page.GetPageNum()-1)
 	}
 
 	if s.CurrentFile == nil || s.IsFileSizeExceed(s.CurrentFile) {
@@ -256,30 +257,30 @@ func (s *Space) CommitCurrentPage() error {
 
 	page_buffer, err := page.Encode()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	pageIndex := NewPageIndex(s.SpaceID, page.GetPageNum(), s.BlockNum, uint64(s.CurrentFile.GetSize()), uint64(len(page_buffer)))
 	err = s.WritePageIndex(pageIndex)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = s.CurrentFile.AppendFileBytes(page_buffer)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = s.SetPageNum(page.GetPageNum())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	s.LastPage = page
 	s.CurrentPage = NewPage(s.SpaceID, page.GetPageNum()+1, s.LastPage)
 	s.LastAppendedAt = time.Now()
 
-	return nil
+	return page, nil
 }
 
 func (s *Space) GetPage(num uint64) (*Page, error) {

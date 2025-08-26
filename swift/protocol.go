@@ -12,9 +12,6 @@ import (
 type PacketType uint8
 
 const (
-)
-
-const (
 	PacketTypePing				PacketType = 0x00
 	PacketTypePong				PacketType = 0x10
 	PacketTypeErrorResponse 		PacketType = 0x0b
@@ -31,6 +28,11 @@ const (
 
 	PacketTypeReplicaConnectRequest 	PacketType = 0x09
 	PacketTypeReplicaConnectResponse 	PacketType = 0x0a
+
+	PacketTypeGetOracleStatusRequest	PacketType = 0x20
+	PacketTypeGetOracleStatusResponse	PacketType = 0x21
+
+	PacketTypeSyncPage			PacketType = 0x22
 )
 
 type Packet struct {

@@ -10,18 +10,40 @@ import (
 	"fortuna/swift"
 	"fortuna/util"
 	"log"
+	"net"
 )
+
 
 func (o *Oracle) RegisterHandlers() error {
 	log.Printf("registering oracle handlers")
 
-	o.swift.RegisterHandler(swift.PacketTypeReplicaConnectRequest, func(ctx context.Context, packet *swift.Packet) error {
+	o.swift.RegisterHandler(swift.PacketTypeReplicaConnectRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		o.AddReplica(conn)
 
+		response := &swift.Packet{
+			Type:    swift.PacketTypeReplicaConnectResponse,
+			Payload: []byte(""),
+		}
 
-		return nil
+		return o.swift.Send(ctx, response)
 	})
 
-	o.swift.RegisterHandler(swift.PacketTypeGenVectorRequest, func(ctx context.Context, packet *swift.Packet) error {
+	o.swift.RegisterHandler(swift.PacketTypeGetOracleStatusRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		status := o.GetOracleStatus()
+		buffer, err := json.Marshal(status)
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		response := &swift.Packet{
+			Type:    swift.PacketTypeGetOracleStatusResponse,
+			Payload: buffer,
+		}
+
+		return o.swift.Send(ctx, response)
+	})
+
+	o.swift.RegisterHandler(swift.PacketTypeGenVectorRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		omap, err := structure.ParseOrderedMap(string(packet.Payload))
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
@@ -63,11 +85,11 @@ func (o *Oracle) RegisterHandlers() error {
 		return o.swift.Send(ctx, response)
 	})
 
-	o.swift.RegisterHandler(swift.PacketTypeStateSeedAPIRequest, func(ctx context.Context, packet *swift.Packet) error {
+	o.swift.RegisterHandler(swift.PacketTypeStateSeedAPIRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		return nil
 	})
 
-	o.swift.RegisterHandler(swift.PacketTypeOracleGETSpaceRequest, func(ctx context.Context, packet *swift.Packet) error {
+	o.swift.RegisterHandler(swift.PacketTypeOracleGETSpaceRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		spaces, err := o.ListSpaces()
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
@@ -86,7 +108,7 @@ func (o *Oracle) RegisterHandlers() error {
 		return o.swift.Send(ctx, response)
 	})
 
-	o.swift.RegisterHandler(swift.PacketTypeStateSeedAPIRequest, func(ctx context.Context, packet *swift.Packet) error {
+	o.swift.RegisterHandler(swift.PacketTypeStateSeedAPIRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		omap, err := structure.ParseOrderedMap(string(packet.Payload))
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
@@ -127,7 +149,7 @@ func (o *Oracle) RegisterHandlers() error {
 
 	})
 
-	o.swift.RegisterHandler(swift.PacketTypeEmitEventRequest, func(ctx context.Context, packet *swift.Packet) error {
+	o.swift.RegisterHandler(swift.PacketTypeEmitEventRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		omap, err := structure.ParseOrderedMap(string(packet.Payload))
 
 		if err != nil {

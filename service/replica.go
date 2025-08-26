@@ -4,12 +4,13 @@ import (
 	"fortuna/core/model"
 	"fortuna/rpc"
 	"fortuna/swift"
+	"fortuna/rock"
+	"encoding/json"
 	"sync"
-	"github.com/linxGnu/grocksdb"
 	"fmt"
+	"github.com/linxGnu/grocksdb"
 	"log"
 	"net"
-	"bufio"
 	"time"
 	"context"
 	"os/signal"
@@ -25,6 +26,7 @@ type Replica struct {
 	connected	bool
 
 	swift		*swift.TCPServer
+	dbs             map[string]*grocksdb.DB
 }
 
 func NewReplica() *Replica {
@@ -33,7 +35,40 @@ func NewReplica() *Replica {
 		swift: swift,
 		Universe: make(map[string]*model.Space),
 		connected: false,
+		dbs: make(map[string]*grocksdb.DB),
 	}
+}
+
+func (rp *Replica) AllocateSpace(spaceID string) (*model.Space, error) {
+        if _, exists := rp.Universe[spaceID]; exists {
+                return nil, fmt.Errorf("spaceID %s already exists", spaceID)
+        }
+
+        space := model.NewSpace(spaceID)
+        rp.Universe[spaceID] = space
+
+        db, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
+        if err != nil {
+                log.Fatalf("failed to get rocks db: %v", err.Error())
+        }
+
+        rp.dbs[spaceID] = db
+
+        return space, nil
+}
+
+func (rp *Replica) GetSpace(spaceID string) *model.Space {
+	space, ok := rp.Universe[spaceID]
+	if !ok {
+		return nil
+	}
+	return space
+}
+
+func (rp *Replica) HandleBroadcastPage(page *model.Page) error {
+	space := rp.GetSpace(page.SpaceID)
+	space.CurrentPage = page
+	return space.CommitCurrentPage()
 }
 
 func (rp *Replica) Connect(addr string) error {
@@ -43,9 +78,42 @@ func (rp *Replica) Connect(addr string) error {
 		return err
 	}
 
-	log.Println("successfully connected")
+	rp.conn = conn
+	packet := rpc.NewReplicaHandshakePacket()
+
+	if err := rpc.SendPacket(rp.conn, packet); err != nil {
+		return rp.Shutdown(err.Error())
+	}
+
+	response, err := rpc.ReadPacket(rp.conn)
+	if err != nil {
+		return rp.Shutdown(err.Error())
+	}
+
+	if response.Type != swift.PacketTypeReplicaConnectResponse {
+		log.Fatalf("invalid packet received, expected %s but, %s", swift.PacketTypeReplicaConnectResponse, response.Type)
+	}
+	
+	log.Println("successfully connected and a handshake done")
 	rp.conn = conn
 	rp.connected = true
+
+	return nil
+}
+
+func (rp *Replica) Shutdown(msg string) error {
+	log.Println("shutdown replica cause: %s", msg)
+	return nil
+}
+
+func (rp *Replica) HandleRecvPacket(packet *swift.Packet) error {
+
+	switch packet.Type {
+	case swift.PacketTypePong:
+		log.Println(string(packet.Payload))
+	case swift.PacketTypeSyncPage:
+			
+	}
 
 	return nil
 }
@@ -55,39 +123,41 @@ func (rp *Replica) Run() error {
 		log.Fatalf("replica not connected")
 	}
 
-	r := bufio.NewReader(rp.conn)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	
-	done := make(chan error, 1)
-	go func() {
-		for {
-			line, err := r.ReadString('\n')
-			if err != nil {
-				done <- err
-				return 
-			}
-			log.Println("recieved buffer: %s", line)
-		}
-	}()
 
-	ping := time.NewTicker(10 * time.Second)
+	ping := time.NewTicker(1 * time.Second)
 	defer ping.Stop()
 
 	for {
 		select {
 		case <- ctx.Done():
 			return ctx.Err()
-		case err := <- done:
-			return err
 		case <- ping.C:
-			log.Println("ping")
-			if _, err := rp.conn.Write(; err != nil {
-				log.Fatalf(err.Error())
-				return err
+			pingPacket := rpc.NewPingPacket()
+
+			pingPacket.Payload, _ = json.Marshal("pong")
+
+			if err := rpc.SendPacket(rp.conn, pingPacket); err != nil {
+				return rp.Shutdown(err.Error())
 			}
+
+			packet, err := rpc.ReadPacket(rp.conn)
+			if err != nil {
+				log.Println("failed to read packet")
+				return rp.Shutdown(err.Error())
+			}
+			
+			rp.HandleRecvPacket(packet)
 		}
 	}
+}
+
+func (rp *Replica) HandlePacket(packet *swift.Packet) error {
+	switch packet.Type{
+	}
+
+	return nil
 }
 
 

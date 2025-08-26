@@ -12,20 +12,21 @@ import (
 	"time"
 )
 
-type PacketHandler func(ctx context.Context, packet *Packet) error
+type PacketHandler func(ctx context.Context, conn net.Conn, packet *Packet) error
 
 type TCPServer struct {
-	handlers map[PacketType]func(ctx context.Context, packet *Packet) error
-	peers    map[string]net.Conn
-	listener net.Listener
+	handlers 	map[PacketType]PacketHandler
+	peers    	map[string]net.Conn
+	listener 	net.Listener
 
-	host    string
-	port    int
-	address string
+	host    	string
+	port    	int
+	address 	string
 
 	onOpenCallbacks	[]func(net.Conn)
 
 	mu sync.RWMutex
+	c 		int64
 }
 
 func NewServer() *TCPServer {
@@ -34,7 +35,7 @@ func NewServer() *TCPServer {
 		host:     "0.0.0.0",
 		peers:    make(map[string]net.Conn),
 		mu:       sync.RWMutex{},
-		handlers: make(map[PacketType]func(ctx context.Context, packet *Packet) error),
+		handlers: make(map[PacketType]PacketHandler),
 	}
 }
 
@@ -60,12 +61,6 @@ func (s *TCPServer) AddOnOpenCallback(cb func(net.Conn)) {
 	s.onOpenCallbacks = append(s.onOpenCallbacks, cb)
 }
 
-type connKey	struct{}
-
-func (s *TCPServer) WithConnection(ctx context.Context, conn net.Conn) context.Context {
-	return context.WithValue(ctx, connKey{}, conn)
-}
-
 func (s *TCPServer) acceptConnections() {
 	for {
 		conn, err := s.listener.Accept()
@@ -77,19 +72,21 @@ func (s *TCPServer) acceptConnections() {
 			go cb(conn)
 		}
 
+		tcp, ok := conn.(*net.TCPConn)
+		if ok {
+			tcp.SetKeepAlive(true)
+			tcp.SetKeepAlivePeriod(10 * time.Second)    // 10초마다 OS keep-alive 패킷
+		}
+
+		log.Println("swift tcp server connection opened")
 		go s.HandleConnection(conn)
 	}
 }
 
 func (s *TCPServer) HandleConnection(conn net.Conn) error {
-	if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
-		return fmt.Errorf("failed to set read deadline: %v", err)
-	}
-
 	ctx := context.WithValue(context.Background(), "connection", conn)
 
 	for {
-		log.Println("received")
 
 		header := make([]byte, 4)
 		if _, err := io.ReadFull(conn, header); err != nil {
@@ -98,6 +95,7 @@ func (s *TCPServer) HandleConnection(conn net.Conn) error {
 			}
 			return fmt.Errorf("failed to read header: %v", err)
 		}
+
 
 		packetLen := binary.LittleEndian.Uint32(header)
 		packetBytes := make([]byte, packetLen)
@@ -113,16 +111,22 @@ func (s *TCPServer) HandleConnection(conn net.Conn) error {
 
 		switch packet.Type {
 		case PacketTypePing:
+			s.c = s.c + 1
+			log.Println("recv ping ", string(packet.Payload))
+			log.Println("send pong ", s.c)
+			buf, _ := json.Marshal(s.c)
+
 			if err := s.Send(ctx, &Packet{
 				Type:    PacketTypePong,
-				Payload: json.RawMessage(`"pong"`),
+				Payload: buf,
 			}); err != nil {
+				log.Println("send pong failed")
 				return fmt.Errorf("failed to send pong response: %v", err)
 			}
 			continue
 		default:
 			if handler, ok := s.handlers[packet.Type]; ok {
-				err := handler(ctx, &packet)
+				err := handler(ctx, conn, &packet)
 
 				if err != nil {
 					return s.SendErrorResponse(ctx, err.Error())
@@ -135,8 +139,6 @@ func (s *TCPServer) HandleConnection(conn net.Conn) error {
 }
 
 func (s *TCPServer) Send(ctx context.Context, packet *Packet) error {
-	// s.mu.RLock() defer s.mu.RUnlock()
-
 	connInfo, ok := ctx.Value("connection").(net.Conn)
 	if !ok || connInfo == nil {
 		return fmt.Errorf("connection info not found in context")
