@@ -42,7 +42,7 @@ type Oracle struct {
 
 	dbs           map[string]*grocksdb.DB
 	Universe      map[string]*model.Space
-	spacePageNums map[string]int64
+	spacePageNums map[string]uint64
 
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction
@@ -99,6 +99,15 @@ func (o *Oracle) GetSynapse(spaceID string) *component.Synapse {
 	return syn
 }
 
+func (o *Oracle) InitSpacePageNumsMap() error {
+	for spaceID := range(o.spacePageNums) {
+		space, _ := o.GetSpace(spaceID)
+		o.spacePageNums[spaceID] = space.PageNum
+	}
+	return nil
+}
+
+
 func (o *Oracle) AllocateSpace(spaceID string) (*model.Space, error) {
 	if _, exists := o.Universe[spaceID]; exists {
 		return nil, fmt.Errorf("spaceID %s already exists", spaceID)
@@ -144,7 +153,7 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 			swift:             swift,
 			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
-			spacePageNums:     make(map[string]int64),
+			spacePageNums:     make(map[string]uint64),
 			replicas:          make(map[string]replicaInfo),
 		}
 
@@ -208,7 +217,11 @@ func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
 		log.Fatalf("failed to commit page: %v", err.Error())
 	}
 
-	o.spacePageNums[spaceID] = int64(space.PageNum)
+	if npage == nil {
+		return nil
+	}
+
+	o.spacePageNums[spaceID] = uint64(space.PageNum)
 	o.pageSignal <- npage
 
 	return nil
@@ -258,6 +271,7 @@ func (o *Oracle) Run(port int) error {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	o.InitSpacePageNumsMap()
 	go o.Daemon()
 
 	<-sigChan

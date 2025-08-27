@@ -207,6 +207,32 @@ func (o *Oracle) RegisterHandlers() error {
 		return o.swift.Send(ctx, response)
 	})
 
+	o.swift.RegisterHandler(swift.PacketTypeReplicaGetSpacePageNumRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		var req struct {
+			SpaceID string	`json:"space_id"`
+		}
+
+		err := json.Unmarshal(packet.Payload, &req)
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		npage, ok := o.spacePageNums[req.SpaceID]
+		if !ok {
+			return o.swift.SendErrorResponse(ctx, fmt.Sprintf("space %s does not exists", req.SpaceID))
+		}
+
+		buf, err := json.Marshal(npage)
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, fmt.Sprintf("failed to ser pagenum %s", npage))
+		}
+
+		response := &swift.Packet{ Type: swift.PacketTypeReplicaGetSpacePageNumResponse, Payload: buf }
+
+		return o.swift.Send(ctx, response)
+	})
+
+
 	o.swift.RegisterHandler(swift.PacketTypeReplicaPageRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		var request PReplicaPageRequest
 		err := json.Unmarshal(packet.Payload, &request)

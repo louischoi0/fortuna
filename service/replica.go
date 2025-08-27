@@ -62,10 +62,16 @@ func (rp *Replica) AllocateSpace(spaceID string) (*model.Space, error) {
 }
 
 func (rp *Replica) GetSpace(spaceID string) *model.Space {
+	var err error
 	space, ok := rp.Universe[spaceID]
+
 	if !ok {
-		return nil
+		space, err = rp.AllocateSpace(spaceID)
+		if err != nil {
+			log.Fatalf("replica has failed to allocate new space: ", err.Error())
+		}
 	}
+
 	return space
 }
 
@@ -162,6 +168,11 @@ func (rp *Replica) Run() error {
 
 	rp.LogUniverseInfo(info)
 
+	err = rp.SyncAllSpaces(info.Spaces)
+	if err != nil {
+		log.Fatalf("failed to sync all spaces before running replica service: %s", err.Error())
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -207,7 +218,7 @@ func (rp *Replica) GetOracleUniverseInfo() (*UniverseInfo, error) {
 	return &info, nil
 }
 
-func (rp *Replica) CheckSpaceUptoDate(spaceID string, date time.Time) (bool, int64, error) {
+func (rp *Replica) CheckSpaceUptoDate(spaceID string) (bool, int64, error) {
 	packet := swift.NewReplicaGetSpacePageNumRequest(spaceID)
 
 	if err := rpc.SendPacket(rp.conn, packet); err != nil {
@@ -223,18 +234,20 @@ func (rp *Replica) CheckSpaceUptoDate(spaceID string, date time.Time) (bool, int
 		return false, 0, err
 	}
 
-	var request int64
-	err = json.Unmarshal(response.Payload, &request)
+	var originPageNum int64
+	err = json.Unmarshal(response.Payload, &originPageNum)
 	if err != nil {
 		return false, 0, err
 	}
 
-	return request == rp.SpacePageNums[spaceID], request, nil
+	return originPageNum == rp.SpacePageNums[spaceID], originPageNum, nil
 }
 
 func (rp *Replica) SyncSpace(spaceID string, pageNum int64) error {
+
 	for i := rp.SpacePageNums[spaceID]; i < pageNum; i++ {
-		packet := swift.NewReplicaPageRequest(spaceID, i)
+		log.Printf("request space page for %s:%v", spaceID, i+1)
+		packet := swift.NewReplicaPageRequest(spaceID, i+1)
 		if err := rpc.SendPacket(rp.conn, packet); err != nil {
 			return err
 		}
@@ -248,8 +261,10 @@ func (rp *Replica) SyncSpace(spaceID string, pageNum int64) error {
 			return err
 		}
 
+		log.Println("page buffer: ", string(response.Payload))
 		page, err := model.DecodePage(response.Payload)
 		if err != nil {
+			log.Fatalf("invalid page received, failed to decod page: %s", err.Error())
 			return err
 		}
 
@@ -262,9 +277,10 @@ func (rp *Replica) SyncSpace(spaceID string, pageNum int64) error {
 	return nil
 }
 
-func (rp *Replica) SyncAllSpaces() error {
-	for spaceID, _ := range rp.Universe {
-		upToDate, pageNum, err := rp.CheckSpaceUptoDate(spaceID, time.Now())
+func (rp *Replica) SyncAllSpaces(oracleSpaces map[string]model.SpaceInfo) error {
+
+	for spaceID, _ := range oracleSpaces {
+		upToDate, pageNum, err := rp.CheckSpaceUptoDate(spaceID)
 		if err != nil {
 			return err
 		} else if !upToDate {
@@ -277,6 +293,8 @@ func (rp *Replica) SyncAllSpaces() error {
 			log.Printf("space %s is up to date", spaceID)
 		}
 	}
+	
+	log.Println("successfull synced with all space data from oracle node")
 
 	return nil
 }

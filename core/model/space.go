@@ -189,6 +189,7 @@ func (s *Space) LoadSpaceData() error {
 		s.LastPage = s.Pages[pageNum-1]
 	}
 
+	s.PageNum = pageNum
 	s.CurrentPage = NewPage(s.SpaceID, pageNum+1, s.LastPage)
 
 	return nil
@@ -233,6 +234,7 @@ func (s *Space) CommitCurrentPage() (*Page, error) {
 	defer s.mu.Unlock()
 
 	page := s.CurrentPage
+	log.Printf("start to commit current page: %s", s.SpaceID)
 
 	if s.ReadLastPageNum() != page.GetPageNum()-1 {
 		return nil, fmt.Errorf("space last page num mismatch expected %v, but %v", page.GetPageNum()-1, s.ReadLastPageNum())
@@ -424,9 +426,13 @@ type SpaceInfo struct {
 	PageNum int64  `json:"page_num"`
 }
 
+func (s *Space) Hash() string {
+	return "thisishash"
+}
+
 func (s *Space) Info() SpaceInfo {
 	return SpaceInfo{
-		Hash:    s.LastPage.Hash(),
+		Hash:    s.Hash(),
 		PageNum: int64(s.PageNum),
 	}
 }
