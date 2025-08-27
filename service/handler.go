@@ -14,8 +14,8 @@ import (
 )
 
 type PReplicaPageRequest struct {
-        SpaceID string  `json:"space_id"`
-        PageNum int64   `json:"page_num"`
+	SpaceID string `json:"space_id"`
+	PageNum int64  `json:"page_num"`
 }
 
 func (o *Oracle) RegisterHandlers() error {
@@ -193,16 +193,49 @@ func (o *Oracle) RegisterHandlers() error {
 		return o.swift.Send(ctx, response)
 	})
 
-	o.swift.RegisterHandler(swift.PacketTypeGETUnivsereInfoRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+	o.swift.RegisterHandler(swift.PacketTypeGETUniverseInfoRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		info := o.GetUniverseInfo()
-		buffer := json.Marshal(info)
+		buffer, err := json.Marshal(info)
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
 		response := &swift.Packet{
-			Type: swift.PacketTypeGETUniverseInfoResponse,
+			Type:    swift.PacketTypeGETUniverseInfoResponse,
 			Payload: buffer,
 		}
 		return o.swift.Send(ctx, response)
 	})
 
+	o.swift.RegisterHandler(swift.PacketTypeReplicaPageRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		var request PReplicaPageRequest
+		err := json.Unmarshal(packet.Payload, &request)
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		space, err := o.GetSpace(request.SpaceID)
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		page, err := space.GetPage(uint64(request.PageNum))
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		buffer, err := page.Encode()
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		response := &swift.Packet{
+			Type:    swift.PacketTypeReplicaPageResponse,
+			Payload: buffer,
+		}
+
+		return o.swift.Send(ctx, response)
+	})
 
 	return nil
 }

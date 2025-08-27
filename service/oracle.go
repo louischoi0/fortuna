@@ -5,9 +5,9 @@ import (
 	"fortuna/core/component"
 	"fortuna/core/model"
 	"fortuna/rock"
+	"fortuna/rpc"
 	"fortuna/swift"
 	"fortuna/util"
-	"fortuna/rpc"
 	"log"
 	"sync"
 
@@ -26,36 +26,36 @@ var oracleOnce sync.Once
 var oracle *Oracle
 
 type replicaInfo struct {
-	ID		string		`json:"id"`
-	conn		net.Conn
+	ID   string `json:"id"`
+	conn net.Conn
 }
 
 func NewReplicaInfo(rid string, conn net.Conn) replicaInfo {
 	return replicaInfo{
-		ID: rid,
+		ID:   rid,
 		conn: conn,
 	}
 }
 
 type Oracle struct {
-	mu 			sync.Mutex
+	mu sync.Mutex
 
-	dbs	 		map[string]*grocksdb.DB
-	Universe 		map[string]*model.Space
-	spacePageNums		map[string]int64
+	dbs           map[string]*grocksdb.DB
+	Universe      map[string]*model.Space
+	spacePageNums map[string]int64
 
-	eventBuffer       	chan *model.EventResult
-	transactionBuffer 	chan *model.Transaction
-	pageSignal		chan *model.Page
+	eventBuffer       chan *model.EventResult
+	transactionBuffer chan *model.Transaction
+	pageSignal        chan *model.Page
 
-	swift    		*swift.TCPServer
-	synapses 		map[string]*component.Synapse
+	swift    *swift.TCPServer
+	synapses map[string]*component.Synapse
 
-	replicas		map[string]replicaInfo
+	replicas map[string]replicaInfo
 }
 
 type UniverseInfo struct {
-	Spaces	map[string]model.SpaceInfo
+	Spaces map[string]model.SpaceInfo
 }
 
 type OracleConfig struct {
@@ -65,25 +65,25 @@ type OracleConfig struct {
 }
 
 type OracleStatus struct {
-	Status		string
-	Version		string
-	Replica 	map[string]replicaInfo `json:"replica"`
+	Status  string
+	Version string
+	Replica map[string]replicaInfo `json:"replica"`
 }
 
 func (o *Oracle) GetUniverseInfo() *UniverseInfo {
 	res := make(map[string]model.SpaceInfo)
 
-	for space_id, space := range(o.Universe) {
+	for space_id, space := range o.Universe {
 		res[space_id] = space.Info()
 	}
 
-	return &UniverseInfo{ Spaces: res }
+	return &UniverseInfo{Spaces: res}
 }
 
 func (o *Oracle) GetOracleStatus() OracleStatus {
 	var res OracleStatus
 
-	res.Replica = o.replicas	
+	res.Replica = o.replicas
 	res.Status = "running"
 	res.Version = "v1.0.0"
 
@@ -119,6 +119,7 @@ func (o *Oracle) AllocateSpace(spaceID string) (*model.Space, error) {
 
 	o.synapses[spaceID] = syn
 	o.dbs[spaceID] = db
+	o.spacePageNums[spaceID] = 0
 
 	return space, nil
 }
@@ -139,12 +140,12 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 		oracle = &Oracle{
 			eventBuffer:       make(chan *model.EventResult, EVENT_BUFFER_SIZE),
 			transactionBuffer: make(chan *model.Transaction, TRANSACTION_BUFFER_SIZE),
-			dbs:         	   make(map[string]*grocksdb.DB), 
+			dbs:               make(map[string]*grocksdb.DB),
 			swift:             swift,
 			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
-			spacePageNums:	   make(map[string]int64),
-			replicas:	   make(map[string]replicaInfo),
+			spacePageNums:     make(map[string]int64),
+			replicas:          make(map[string]replicaInfo),
 		}
 
 		_, err := oracle.AllocateSpace(initialSpaceID)
@@ -163,7 +164,7 @@ func (o *Oracle) NewPushPagePacket(page *model.Page) *swift.Packet {
 	}
 
 	return &swift.Packet{
-		Type: swift.PacketTypePushPage,
+		Type:    swift.PacketTypePushPage,
 		Payload: buf,
 	}
 }
@@ -178,7 +179,7 @@ func (o *Oracle) FallbackPushPage(replica replicaInfo, page *model.Page) error {
 }
 
 func (o *Oracle) PushPageReplicas(page *model.Page) error {
-	for _, replica := range(o.replicas) {
+	for _, replica := range o.replicas {
 		err := o.PushPageReplica(replica, page)
 		if err != nil {
 			o.FallbackPushPage(replica, page)
@@ -202,12 +203,12 @@ func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
 
 	space.CurrentPage.AppendEventExecution(event)
 
-	npage, err := space.MaybeCommitPage() 
+	npage, err := space.MaybeCommitPage()
 	if err != nil {
 		log.Fatalf("failed to commit page: %v", err.Error())
 	}
 
-	o.spacePageNums[spaceID] = space.PageNum
+	o.spacePageNums[spaceID] = int64(space.PageNum)
 	o.pageSignal <- npage
 
 	return nil
@@ -271,4 +272,3 @@ func (o *Oracle) AddReplica(conn net.Conn) {
 	rpi := NewReplicaInfo(s, conn)
 	o.replicas[rpi.ID] = rpi
 }
-

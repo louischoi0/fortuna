@@ -118,17 +118,18 @@ func NewPageIndex(spaceID string, pageNum uint64, blockNum uint64, offset uint64
 }
 
 type Space struct {
-	mu      	sync.Mutex
-	SpaceID 	string
-	CurrentPage 	*Page
-	LastPage    	*Page
-	Pages       	[]*Page
-	Storage 	*storage.FileStorage
-	meta    	*grocksdb.DB
-	BlockNum    	uint64
-	CurrentFile 	*storage.File
-	LastAppendedAt 	time.Time
-	IsReplica 	bool
+	mu             sync.Mutex
+	SpaceID        string
+	CurrentPage    *Page
+	LastPage       *Page
+	Pages          []*Page
+	Storage        *storage.FileStorage
+	meta           *grocksdb.DB
+	FileNum        uint64
+	PageNum        uint64
+	CurrentFile    *storage.File
+	LastAppendedAt time.Time
+	IsReplica      bool
 }
 
 func NewSpace(spaceID string) *Space {
@@ -163,7 +164,7 @@ func NewSpace(spaceID string) *Space {
 		SpaceID:     spaceID,
 		meta:        metaDB,
 		Storage:     storage,
-		IsReplica:    false,
+		IsReplica:   false,
 	}
 }
 
@@ -198,8 +199,8 @@ func GetFileName(blockNum uint64) string {
 }
 
 func (s *Space) NewNextPageFile() error {
-	s.BlockNum++
-	fileName := GetFileName(s.BlockNum)
+	s.FileNum++
+	fileName := GetFileName(s.FileNum)
 	s.CurrentFile = storage.NewFile(s.Storage, fileName)
 
 	err := s.SetCurrentFile(s.CurrentFile)
@@ -260,7 +261,7 @@ func (s *Space) CommitCurrentPage() (*Page, error) {
 		return nil, err
 	}
 
-	pageIndex := NewPageIndex(s.SpaceID, page.GetPageNum(), s.BlockNum, uint64(s.CurrentFile.GetSize()), uint64(len(page_buffer)))
+	pageIndex := NewPageIndex(s.SpaceID, page.GetPageNum(), s.FileNum, uint64(s.CurrentFile.GetSize()), uint64(len(page_buffer)))
 	err = s.WritePageIndex(pageIndex)
 	if err != nil {
 		return nil, err
@@ -419,14 +420,13 @@ func (s *Space) SetMetaDB(meta *grocksdb.DB) {
 }
 
 type SpaceInfo struct {
-	Hash		string 	`json:"hash"`
-	PageNum		int64	`json:"page_num"`
+	Hash    string `json:"hash"`
+	PageNum int64  `json:"page_num"`
 }
 
 func (s *Space) Info() SpaceInfo {
 	return SpaceInfo{
-		Hash: "",
-		PageNum: s.PageNum,
+		Hash:    s.LastPage.Hash(),
+		PageNum: int64(s.PageNum),
 	}
 }
-
