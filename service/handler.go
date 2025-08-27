@@ -13,6 +13,10 @@ import (
 	"net"
 )
 
+type PReplicaPageRequest struct {
+        SpaceID string  `json:"space_id"`
+        PageNum int64   `json:"page_num"`
+}
 
 func (o *Oracle) RegisterHandlers() error {
 	log.Printf("registering oracle handlers")
@@ -188,6 +192,17 @@ func (o *Oracle) RegisterHandlers() error {
 
 		return o.swift.Send(ctx, response)
 	})
+
+	o.swift.RegisterHandler(swift.PacketTypeGETUnivsereInfoRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		info := o.GetUniverseInfo()
+		buffer := json.Marshal(info)
+		response := &swift.Packet{
+			Type: swift.PacketTypeGETUniverseInfoResponse,
+			Payload: buffer,
+		}
+		return o.swift.Send(ctx, response)
+	})
+
 
 	return nil
 }

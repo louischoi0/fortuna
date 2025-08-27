@@ -417,3 +417,16 @@ func (s *Space) ReadLastPageNum() uint64 {
 func (s *Space) SetMetaDB(meta *grocksdb.DB) {
 	s.meta = meta
 }
+
+type SpaceInfo struct {
+	Hash		string 	`json:"hash"`
+	PageNum		int64	`json:"page_num"`
+}
+
+func (s *Space) Info() SpaceInfo {
+	return SpaceInfo{
+		Hash: "",
+		PageNum: s.PageNum,
+	}
+}
+

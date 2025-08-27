@@ -68,7 +68,8 @@ func (rp *Replica) GetSpace(spaceID string) *model.Space {
 func (rp *Replica) HandleBroadcastPage(page *model.Page) error {
 	space := rp.GetSpace(page.SpaceID)
 	space.CurrentPage = page
-	return space.CommitCurrentPage()
+	_, err := space.CommitCurrentPage()
+	return err
 }
 
 func (rp *Replica) Connect(addr string) error {
@@ -112,10 +113,36 @@ func (rp *Replica) HandleRecvPacket(packet *swift.Packet) error {
 	case swift.PacketTypePong:
 		log.Println(string(packet.Payload))
 	case swift.PacketTypeSyncPage:
-			
+		page, err := model.DecodePage(packet.Payload)
+		if err != nil {
+			log.Fatalf("invalid page buffer, failed to decode page: %v", err.Error())
+		}
+
+		err = rp.HandleBroadcastPage(page)
+		if err != nil { 
+			log.Fatalf("failed to handle broadcast page: %v", err.Error())
+		}
 	}
 
 	return nil
+}
+
+func (rp *Replica) PingMasterServer() error {
+	pingPacket := rpc.NewPingPacket()
+
+	pingPacket.Payload, _ = json.Marshal("pong")
+
+	if err := rpc.SendPacket(rp.conn, pingPacket); err != nil {
+		return rp.Shutdown(err.Error())
+	}
+
+	packet, err := rpc.ReadPacket(rp.conn)
+	if err != nil {
+		log.Println("failed to read packet")
+		return rp.Shutdown(err.Error())
+	}
+	
+	return rp.HandleRecvPacket(packet)
 }
 
 func (rp *Replica) Run() error {
@@ -133,23 +160,31 @@ func (rp *Replica) Run() error {
 		select {
 		case <- ctx.Done():
 			return ctx.Err()
-		case <- ping.C:
-			pingPacket := rpc.NewPingPacket()
-
-			pingPacket.Payload, _ = json.Marshal("pong")
-
-			if err := rpc.SendPacket(rp.conn, pingPacket); err != nil {
-				return rp.Shutdown(err.Error())
-			}
-
-			packet, err := rpc.ReadPacket(rp.conn)
-			if err != nil {
-				log.Println("failed to read packet")
-				return rp.Shutdown(err.Error())
-			}
-			
-			rp.HandleRecvPacket(packet)
 		}
+	}
+}
+
+func NewGetUniverseInfoPacket() *swift.Packet {
+	return &swift.Packet{
+		Type: PacketTypeGetUniverseInfoRequest,
+		Payload: []byte(""),
+	}
+}
+
+func (rp *Replica) GetOracleUniverseInfo() (*UniverseInfo, error) {
+	packet := NewGetUniverseInfoPacket()	
+
+	if err := rpc.SendPacket(rp.conn, packet); err != nil {
+		return nil, err
+	}
+	
+	response, err := rpc.ReadPacket(rp.conn)
+	if err != nil {
+		return err
+	}
+
+	if reponse.Type != swift.PacketTypeGETUniverseInfoResponse {
+		log.Fatalf("unexpected packet type received, expected PacketTypeGETUniverseInfoResponse but %s", string(reponse.Type))
 	}
 }
 

@@ -42,6 +42,7 @@ type Oracle struct {
 
 	dbs	 		map[string]*grocksdb.DB
 	Universe 		map[string]*model.Space
+	spacePageNums		map[string]int64
 
 	eventBuffer       	chan *model.EventResult
 	transactionBuffer 	chan *model.Transaction
@@ -51,6 +52,10 @@ type Oracle struct {
 	synapses 		map[string]*component.Synapse
 
 	replicas		map[string]replicaInfo
+}
+
+type UniverseInfo struct {
+	Spaces	map[string]model.SpaceInfo
 }
 
 type OracleConfig struct {
@@ -63,6 +68,16 @@ type OracleStatus struct {
 	Status		string
 	Version		string
 	Replica 	map[string]replicaInfo `json:"replica"`
+}
+
+func (o *Oracle) GetUniverseInfo() *UniverseInfo {
+	res := make(map[string]model.SpaceInfo)
+
+	for space_id, space := range(o.Universe) {
+		res[space_id] = space.Info()
+	}
+
+	return &UniverseInfo{ Spaces: res }
 }
 
 func (o *Oracle) GetOracleStatus() OracleStatus {
@@ -128,6 +143,7 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 			swift:             swift,
 			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
+			spacePageNums:	   make(map[string]int64),
 			replicas:	   make(map[string]replicaInfo),
 		}
 
@@ -140,32 +156,32 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 	return oracle
 }
 
-func (o *Oracle) NewSyncPagePacket(page *model.Page) *swift.Packet {
+func (o *Oracle) NewPushPagePacket(page *model.Page) *swift.Packet {
 	buf, err := page.Encode()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
 	return &swift.Packet{
-		Type: swift.PacketTypeSyncPage,
+		Type: swift.PacketTypePushPage,
 		Payload: buf,
 	}
 }
 
-func (o *Oracle) SyncPageReplica(replica replicaInfo, page *model.Page) error {
-	packet := o.NewSyncPagePacket(page)
+func (o *Oracle) PushPageReplica(replica replicaInfo, page *model.Page) error {
+	packet := o.NewPushPagePacket(page)
 	return rpc.SendPacket(replica.conn, packet)
 }
 
-func (o *Oracle) FallbackSyncPage(replica replicaInfo, page *model.Page) error {
+func (o *Oracle) FallbackPushPage(replica replicaInfo, page *model.Page) error {
 	return nil
 }
 
-func (o *Oracle) SyncPageReplicas(page *model.Page) error {
+func (o *Oracle) PushPageReplicas(page *model.Page) error {
 	for _, replica := range(o.replicas) {
-		err := o.SyncPageReplica(replica, page)
+		err := o.PushPageReplica(replica, page)
 		if err != nil {
-			o.FallbackSyncPage(replica, page)
+			o.FallbackPushPage(replica, page)
 		}
 	}
 
@@ -174,8 +190,8 @@ func (o *Oracle) SyncPageReplicas(page *model.Page) error {
 
 func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
 	log.Println("process event result buffer: ", event.GetSpaceID())
-
-	space, err := o.GetSpace(event.GetSpaceID())
+	spaceID := event.GetSpaceID()
+	space, err := o.GetSpace(spaceID)
 	if err != nil {
 		log.Fatalf("failed to get space: %v", err.Error())
 	}
@@ -191,8 +207,8 @@ func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
 		log.Fatalf("failed to commit page: %v", err.Error())
 	}
 
+	o.spacePageNums[spaceID] = space.PageNum
 	o.pageSignal <- npage
-
 
 	return nil
 }
@@ -207,7 +223,7 @@ func (o *Oracle) Daemon() error {
 
 		case npage := <-o.pageSignal:
 			log.Println("todo broadcast page to replicas")
-			o.SyncPageReplicas(npage)
+			o.PushPageReplicas(npage)
 		}
 	}
 }

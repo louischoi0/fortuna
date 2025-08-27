@@ -112,8 +112,6 @@ func (s *TCPServer) HandleConnection(conn net.Conn) error {
 		switch packet.Type {
 		case PacketTypePing:
 			s.c = s.c + 1
-			log.Println("recv ping ", string(packet.Payload))
-			log.Println("send pong ", s.c)
 			buf, _ := json.Marshal(s.c)
 
 			if err := s.Send(ctx, &Packet{

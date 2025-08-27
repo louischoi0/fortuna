@@ -32,7 +32,13 @@ const (
 	PacketTypeGetOracleStatusRequest	PacketType = 0x20
 	PacketTypeGetOracleStatusResponse	PacketType = 0x21
 
-	PacketTypeSyncPage			PacketType = 0x22
+	PacketTypePushPage			PacketType = 0x22
+
+	PacketTypeReplicaPageRequest		PacketType = 0x23
+	PacketTypeReplicaPageResponse		PacketType = 0x24
+
+	PacketTypeGETUnivserInfoRequest		PacketType = 0x25
+	PacketTypeGETUnivserInfoResponse	PacketType = 0x26
 )
 
 type Packet struct {
