@@ -16,6 +16,8 @@ import (
 	"github.com/linxGnu/grocksdb"
 )
 
+var __spaces map[string]*Space
+
 type PageIndex struct {
 	SpaceID  string
 	PageNum  uint64
@@ -118,32 +120,33 @@ func NewPageIndex(spaceID string, pageNum uint64, blockNum uint64, offset uint64
 }
 
 type Space struct {
-	mu             		sync.Mutex
+	mu sync.Mutex
 
-	SpaceID        		string
-	CurrentPage    		*Page
+	SpaceID     string
+	CurrentPage *Page
 
-	LastPage       		*Page
-	LastCommittedPageNum	uint64
+	LastPage             *Page
+	LastCommittedPageNum uint64
 
-	Pages          		[]*Page
-	Storage        		*storage.FileStorage
-	meta           		*grocksdb.DB
-	FileNum        		uint64
-	CurrentFile    		*storage.File
+	Pages       []*Page
+	Storage     *storage.FileStorage
+	meta        *grocksdb.DB
+	FileNum     uint64
+	CurrentFile *storage.File
 
-	PageNum			uint64
-	LastAppendedAt 		time.Time
-	IsReplica      		bool
+	PageNum        uint64
+	LastAppendedAt time.Time
+	IsReplica      bool
 }
 
-func NewSpace(spaceID string) *Space {
+func NewSpace(spaceID string, metaDB *grocksdb.DB) *Space {
+	log.Printf("initailizing space %s", spaceID)
+
 	dir := filepath.Join(storage.DataRootDir(), fmt.Sprintf("space.%s", spaceID))
 	storage := storage.NewFileStorage(dir)
-	metaDB, err := rock.GetDBInstance(fmt.Sprintf("space_additional.%s", spaceID))
 
-	if err != nil {
-		log.Fatalf("failed to get space meta db: %v", err.Error())
+	if _, ok := __spaces[spaceID]; ok {
+		log.Fatalf("space %s initialized again, not allowed", spaceID)
 	}
 
 	pageNum, err := ReadLastPageNum(metaDB)
@@ -151,19 +154,22 @@ func NewSpace(spaceID string) *Space {
 		log.Fatalf("failed to get last page num: %v", err.Error())
 	}
 
+	var space *Space
+
 	if pageNum != 0 {
-		space := &Space{
+		space = &Space{
 			SpaceID: spaceID,
 			Storage: storage,
 			meta:    metaDB,
 		}
 		space.LoadSpaceData()
+		space.CommitSpaceHeader()
 		return space
 	}
 
 	page := NewPage(spaceID, 1, nil)
 
-	return &Space{
+	space = &Space{
 		CurrentPage: page,
 		LastPage:    nil,
 		SpaceID:     spaceID,
@@ -171,6 +177,9 @@ func NewSpace(spaceID string) *Space {
 		Storage:     storage,
 		IsReplica:   false,
 	}
+
+	space.CommitSpaceHeader()
+	return space
 }
 
 func (s *Space) LoadSpaceData() error {
@@ -430,9 +439,9 @@ func (s *Space) SetMetaDB(meta *grocksdb.DB) {
 }
 
 type SpaceInfo struct {
-	Hash    		string	`json:"hash"`
-	ActivePageNum 		int64  	`json:"active_page_num"`
-	LastCommittedPageNum	int64	`json:"last_committed_page_num"`
+	Hash                 string `json:"hash"`
+	ActivePageNum        int64  `json:"active_page_num"`
+	LastCommittedPageNum int64  `json:"last_committed_page_num"`
 }
 
 func (s *Space) Hash() string {
@@ -441,10 +450,27 @@ func (s *Space) Hash() string {
 
 func (s *Space) Info() SpaceInfo {
 	return SpaceInfo{
-		Hash:    s.Hash(),
-		ActivePageNum: int64(s.PageNum),
+		Hash:                 s.Hash(),
+		ActivePageNum:        int64(s.PageNum),
 		LastCommittedPageNum: int64(s.LastCommittedPageNum),
 	}
 }
 
+func (s *Space) CommitSpaceHeader() error {
+	log.Printf("commiting space header for %s", s.SpaceID)
 
+	err := rock.SetValue(s.meta, fmt.Sprintf("space-%v", s.SpaceID), util.EncodeUint64(s.PageNum))
+	if err != nil {
+		log.Fatalf("failed to set space id: %v", err.Error())
+	}
+
+	return nil
+}
+
+func ListSpaces(db *grocksdb.DB) ([]string, error) {
+	cb := func(key string, value []byte) string {
+		return key
+	}
+
+	return rock.ScanC(db, "space-", cb)
+}

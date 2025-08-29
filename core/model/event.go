@@ -87,6 +87,7 @@ func NewEventSpecFromOrderedMap(data *structure.OrderedMap) (*EventSpec, error) 
 }
 
 type Event struct {
+	ID        string `json:"id"`
 	Timestamp uint64 `json:"timestamp"`
 	Publisher string `json:"publisher"`
 	SpaceID   string `json:"space_id"`

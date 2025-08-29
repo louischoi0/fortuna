@@ -1,6 +1,7 @@
 package rock
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -123,4 +124,80 @@ func GetValue(db *grocksdb.DB, key string) ([]byte, error) {
 	copy(ret, data)
 
 	return ret, nil
+}
+
+func Sacn(db *grocksdb.DB, prefix string) (map[string][]byte, error) {
+	readOpts := grocksdb.NewDefaultReadOptions()
+	defer readOpts.Destroy()
+
+	it := db.NewIterator(readOpts)
+	defer it.Close()
+
+	results := make(map[string][]byte)
+
+	it.Seek([]byte(prefix))
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		value := it.Value()
+
+		if !bytes.HasPrefix(key.Data(), []byte(prefix)) {
+			key.Free()
+			value.Free()
+			break
+		}
+
+		k := make([]byte, len(key.Data()))
+		copy(k, key.Data())
+
+		v := make([]byte, len(value.Data()))
+		copy(v, value.Data())
+
+		results[string(k)] = v
+
+		key.Free()
+		value.Free()
+	}
+
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func ScanC[T any](db *grocksdb.DB, prefix string, cb func(key string, value []byte) T) ([]T, error) {
+	readOpts := grocksdb.NewDefaultReadOptions()
+	defer readOpts.Destroy()
+
+	it := db.NewIterator(readOpts)
+	defer it.Close()
+
+	var results []T
+
+	it.Seek([]byte(prefix))
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		value := it.Value()
+
+		if !bytes.HasPrefix(key.Data(), []byte(prefix)) {
+			key.Free()
+			value.Free()
+			break
+		}
+
+		k := string(key.Data())
+		v := make([]byte, len(value.Data()))
+		copy(v, value.Data())
+
+		results = append(results, cb(k, v))
+
+		key.Free()
+		value.Free()
+	}
+
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }

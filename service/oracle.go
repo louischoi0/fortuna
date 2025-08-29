@@ -40,7 +40,9 @@ func NewReplicaInfo(rid string, conn net.Conn) replicaInfo {
 type Oracle struct {
 	mu sync.Mutex
 
-	dbs           map[string]*grocksdb.DB
+	dbs    map[string]*grocksdb.DB
+	metaDB *grocksdb.DB
+
 	Universe      map[string]*model.Space
 	spacePageNums map[string]uint64
 
@@ -100,20 +102,19 @@ func (o *Oracle) GetSynapse(spaceID string) *component.Synapse {
 }
 
 func (o *Oracle) InitSpacePageNumsMap() error {
-	for spaceID := range(o.spacePageNums) {
+	for spaceID := range o.spacePageNums {
 		space, _ := o.GetSpace(spaceID)
 		o.spacePageNums[spaceID] = space.PageNum
 	}
 	return nil
 }
 
-
-func (o *Oracle) AllocateSpace(spaceID string) (*model.Space, error) {
+func (o *Oracle) AllocateSpace(spaceID string, metaDB *grocksdb.DB) (*model.Space, error) {
 	if _, exists := o.Universe[spaceID]; exists {
 		return nil, fmt.Errorf("spaceID %s already exists", spaceID)
 	}
 
-	space := model.NewSpace(spaceID)
+	space := model.NewSpace(spaceID, metaDB)
 	o.Universe[spaceID] = space
 
 	syn := component.NewSynapse(space)
@@ -145,11 +146,17 @@ func (o *Oracle) ListSpaces() ([]string, error) {
 func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleConfig) *Oracle {
 	oracleOnce.Do(func() {
 		swift := swift.NewServer()
+		metaDB, err := rock.GetDBInstance(fmt.Sprintf("space_additional.%s", initialSpaceID))
+
+		if err != nil {
+			log.Fatalf("failed to get space meta db: %v", err.Error())
+		}
 
 		oracle = &Oracle{
 			eventBuffer:       make(chan *model.EventResult, EVENT_BUFFER_SIZE),
 			transactionBuffer: make(chan *model.Transaction, TRANSACTION_BUFFER_SIZE),
 			dbs:               make(map[string]*grocksdb.DB),
+			metaDB:            metaDB,
 			swift:             swift,
 			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
@@ -157,13 +164,28 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 			replicas:          make(map[string]replicaInfo),
 		}
 
-		_, err := oracle.AllocateSpace(initialSpaceID)
+		_, err = oracle.AllocateSpace(initialSpaceID, metaDB)
 		if err != nil {
 			log.Fatalf("failed to allocate space: %v", err.Error())
 		}
 	})
 
 	return oracle
+}
+
+func (o *Oracle) LoadUniverse() error {
+	spaces, err := model.ListSpaces(o.metaDB)
+	if err != nil {
+		return err
+	}
+
+	for _, spaceID := range spaces {
+		if _, exists := o.Universe[spaceID]; exists {
+			continue
+		}
+		o.Universe[spaceID] = model.NewSpace(spaceID, o.metaDB)
+	}
+	return nil
 }
 
 func (o *Oracle) NewPushPagePacket(page *model.Page) *swift.Packet {
@@ -220,7 +242,6 @@ func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
 	if npage == nil {
 		return nil
 	}
-
 
 	log.Println("set space page num map for space %s = %v", spaceID, uint64(space.PageNum))
 	o.spacePageNums[spaceID] = uint64(space.PageNum)

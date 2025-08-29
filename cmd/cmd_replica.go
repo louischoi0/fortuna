@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"fortuna/service"
 	"fortuna/core/storage"
 	"fortuna/rock"
+	"fortuna/service"
 	"log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +21,9 @@ func CreateReplicaRunCMD() *cobra.Command {
 			rock.SetMetastoreDataRootDir(data_dir)
 
 			replica := service.NewReplica()
+			replica.ActivateIndexer()
 
-			err := replica.Connect(masterNodeAddr)		
+			err := replica.Connect(masterNodeAddr)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -46,5 +48,3 @@ func CreateReplicaCMD() *cobra.Command {
 
 	return cmd
 }
-
-

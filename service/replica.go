@@ -19,16 +19,19 @@ import (
 )
 
 type Replica struct {
-	mu            	sync.Mutex
-	universeDB    	*grocksdb.DB
-	Universe      	map[string]*model.Space
-	SpacePageNums 	map[string]int64
+	ID            string
+	mu            sync.Mutex
+	metaDB        *grocksdb.DB
+	Universe      map[string]*model.Space
+	SpacePageNums map[string]int64
 
-	conn      	net.Conn
-	connected 	bool
+	conn      net.Conn
+	connected bool
 
-	swift 		*swift.TCPServer
-	dbs   		map[string]*grocksdb.DB
+	swift *swift.TCPServer
+	dbs   map[string]*grocksdb.DB
+
+	indexer *SpaceIndexer
 }
 
 func NewReplica() *Replica {
@@ -42,12 +45,30 @@ func NewReplica() *Replica {
 	}
 }
 
+func (rp *Replica) LoadUniverse() error {
+	spaces, err := model.ListSpaces(rp.metaDB)
+	if err != nil {
+		return err
+	}
+
+	for _, spaceID := range spaces {
+		rp.Universe[spaceID] = model.NewSpace(spaceID, rp.metaDB)
+	}
+	return nil
+}
+
+func (rp *Replica) ActivateIndexer() *SpaceIndexer {
+	log.Printf("activating replica event indexer %s", rp.ID)
+	rp.indexer = NewSpaceIndexer(rp.Universe, rp.dbs)
+	return rp.indexer
+}
+
 func (rp *Replica) AllocateSpace(spaceID string) (*model.Space, error) {
 	if _, exists := rp.Universe[spaceID]; exists {
 		return nil, fmt.Errorf("spaceID %s already exists", spaceID)
 	}
 
-	space := model.NewSpace(spaceID)
+	space := model.NewSpace(spaceID, rp.metaDB)
 	rp.Universe[spaceID] = space
 
 	db, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
@@ -301,7 +322,7 @@ func (rp *Replica) SyncAllSpaces(oracleSpaces map[string]model.SpaceInfo) error 
 			if err != nil {
 				return err
 			}
-		} 
+		}
 	}
 
 	return nil
