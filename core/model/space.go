@@ -118,18 +118,23 @@ func NewPageIndex(spaceID string, pageNum uint64, blockNum uint64, offset uint64
 }
 
 type Space struct {
-	mu             sync.Mutex
-	SpaceID        string
-	CurrentPage    *Page
-	LastPage       *Page
-	Pages          []*Page
-	Storage        *storage.FileStorage
-	meta           *grocksdb.DB
-	FileNum        uint64
-	PageNum        uint64
-	CurrentFile    *storage.File
-	LastAppendedAt time.Time
-	IsReplica      bool
+	mu             		sync.Mutex
+
+	SpaceID        		string
+	CurrentPage    		*Page
+
+	LastPage       		*Page
+	LastCommittedPageNum	uint64
+
+	Pages          		[]*Page
+	Storage        		*storage.FileStorage
+	meta           		*grocksdb.DB
+	FileNum        		uint64
+	CurrentFile    		*storage.File
+
+	PageNum			uint64
+	LastAppendedAt 		time.Time
+	IsReplica      		bool
 }
 
 func NewSpace(spaceID string) *Space {
@@ -189,8 +194,9 @@ func (s *Space) LoadSpaceData() error {
 		s.LastPage = s.Pages[pageNum-1]
 	}
 
-	s.PageNum = pageNum
+	s.LastCommittedPageNum = pageNum
 	s.CurrentPage = NewPage(s.SpaceID, pageNum+1, s.LastPage)
+	s.PageNum = pageNum + 1
 
 	return nil
 }
@@ -280,6 +286,8 @@ func (s *Space) CommitCurrentPage() (*Page, error) {
 	}
 
 	s.LastPage = page
+	s.LastCommittedPageNum = page.GetPageNum()
+
 	s.CurrentPage = NewPage(s.SpaceID, page.GetPageNum()+1, s.LastPage)
 	s.LastAppendedAt = time.Now()
 
@@ -422,8 +430,9 @@ func (s *Space) SetMetaDB(meta *grocksdb.DB) {
 }
 
 type SpaceInfo struct {
-	Hash    string `json:"hash"`
-	PageNum int64  `json:"page_num"`
+	Hash    		string	`json:"hash"`
+	ActivePageNum 		int64  	`json:"active_page_num"`
+	LastCommittedPageNum	int64	`json:"last_committed_page_num"`
 }
 
 func (s *Space) Hash() string {
@@ -433,6 +442,9 @@ func (s *Space) Hash() string {
 func (s *Space) Info() SpaceInfo {
 	return SpaceInfo{
 		Hash:    s.Hash(),
-		PageNum: int64(s.PageNum),
+		ActivePageNum: int64(s.PageNum),
+		LastCommittedPageNum: int64(s.LastCommittedPageNum),
 	}
 }
+
+

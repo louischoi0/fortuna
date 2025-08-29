@@ -221,6 +221,8 @@ func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
 		return nil
 	}
 
+
+	log.Println("set space page num map for space %s = %v", spaceID, uint64(space.PageNum))
 	o.spacePageNums[spaceID] = uint64(space.PageNum)
 	o.pageSignal <- npage
 
@@ -233,7 +235,7 @@ func (o *Oracle) Daemon() error {
 	for {
 		select {
 		case event := <-o.eventBuffer:
-			o.HandleEventResultBuffer(event)
+			go o.HandleEventResultBuffer(event)
 
 		case npage := <-o.pageSignal:
 			log.Println("todo broadcast page to replicas")

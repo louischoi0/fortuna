@@ -57,6 +57,33 @@ func CreateGenVectorAPI() *cobra.Command {
 	return cmd
 }
 
+func CreateUniverseInfoAPI() *cobra.Command {
+	var endpoint string
+
+	cmd := &cobra.Command{
+		Use:   "universe",
+		Short: "get universe info",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			request := rpc.CreateRequest(swift.PacketTypeGETUniverseInfoRequest, endpoint, "")
+			response, err := request.Call()
+
+			if err != nil {
+				fmt.Println("error: ", err.Error())
+			}
+
+			if err == nil {
+				buf := swift.FormatJSONResponse(response.Payload)
+				fmt.Println(buf)
+			}
+		},
+	}
+
+	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
+
+	return cmd
+}
+
 func CreateGenStateSeedAPI() *cobra.Command {
 	var kernel_version string
 	var payload string
@@ -97,6 +124,7 @@ func CreateAPICMD() *cobra.Command {
 
 	cmd.AddCommand(CreateGenStateSeedAPI())
 	cmd.AddCommand(CreateGenVectorAPI())
+	cmd.AddCommand(CreateUniverseInfoAPI())
 
 	return cmd
 }

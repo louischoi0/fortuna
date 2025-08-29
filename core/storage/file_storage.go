@@ -8,6 +8,16 @@ import (
 	"sync"
 )
 
+var ROOT_DIR = "data"
+
+func SetRootDir(dir string) {
+	ROOT_DIR = dir
+}
+
+func DataRootDir() string {
+	return ROOT_DIR
+}
+
 type FileStorage struct {
 	mu        sync.Mutex
 	Directory string
@@ -52,10 +62,6 @@ type File struct {
 	removed bool
 }
 
-func DataRootDir() string {
-	return "data"
-}
-
 func NewFile(storage *FileStorage, name string) *File {
 	path := filepath.Join(storage.Directory, name)
 
@@ -91,6 +97,8 @@ func (file *File) Close() error {
 func (file *File) AppendFileBytes(data []byte) error {
 	file.mu.Lock()
 	defer file.mu.Unlock()
+
+	log.Println("append buffer to file %s", file.Path)
 
 	if _, err := file.f.Write(data); err != nil {
 		return err

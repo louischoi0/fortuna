@@ -254,6 +254,7 @@ func (o *Oracle) RegisterHandlers() error {
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
 		}
+		log.Println("buffer size: ", len(buffer))
 
 		response := &swift.Packet{
 			Type:    swift.PacketTypeReplicaPageResponse,

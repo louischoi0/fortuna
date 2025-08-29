@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fortuna/service"
+	"fortuna/core/storage"
+	"fortuna/rock"
 	"log"
 	"github.com/spf13/cobra"
 )
@@ -12,6 +14,11 @@ func CreateReplicaRunCMD() *cobra.Command {
 		Short: "run replica",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			masterNodeAddr, _ := cmd.Flags().GetString("maddr")
+			data_dir, _ := cmd.Flags().GetString("dir")
+
+			storage.SetRootDir(data_dir)
+			rock.SetMetastoreDataRootDir(data_dir)
+
 			replica := service.NewReplica()
 
 			err := replica.Connect(masterNodeAddr)		
@@ -25,6 +32,7 @@ func CreateReplicaRunCMD() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("maddr", "a", CLI_DEFAULT_ENDPOINT, "endpoint")
+	cmd.Flags().StringP("dir", "d", "replica", "endpoint")
 	return cmd
 }
 

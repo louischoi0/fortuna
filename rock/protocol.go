@@ -10,8 +10,14 @@ import (
 	"github.com/linxGnu/grocksdb"
 )
 
+var MetastoreRootDir = "data"
+
 func MetaStoreDataRootDir() string {
-	return "data"
+	return MetastoreRootDir
+}
+
+func SetMetastoreDataRootDir(dir string) {
+	MetastoreRootDir = dir
 }
 
 var (

@@ -19,16 +19,16 @@ import (
 )
 
 type Replica struct {
-	mu            sync.Mutex
-	universeDB    *grocksdb.DB
-	Universe      map[string]*model.Space
-	SpacePageNums map[string]int64
+	mu            	sync.Mutex
+	universeDB    	*grocksdb.DB
+	Universe      	map[string]*model.Space
+	SpacePageNums 	map[string]int64
 
-	conn      net.Conn
-	connected bool
+	conn      	net.Conn
+	connected 	bool
 
-	swift *swift.TCPServer
-	dbs   map[string]*grocksdb.DB
+	swift 		*swift.TCPServer
+	dbs   		map[string]*grocksdb.DB
 }
 
 func NewReplica() *Replica {
@@ -183,13 +183,24 @@ func (rp *Replica) Run() error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-ping.C:
+			info, err := rp.GetOracleUniverseInfo()
+
+			if err != nil {
+				log.Fatalf("failed to get universe info from oracle: %s", err.Error())
+			}
+
+			err = rp.SyncAllSpaces(info.Spaces)
+			if err != nil {
+				log.Fatalf("failed to sync: %s", err.Error())
+			}
 		}
 	}
 }
 
 func (rp *Replica) LogUniverseInfo(info *UniverseInfo) {
 	for spaceID, spaceInfo := range info.Spaces {
-		log.Printf("space %s - hash: %s, page num: %d", spaceID, spaceInfo.Hash, spaceInfo.PageNum)
+		log.Printf("space %s - hash: %s, page num: %d", spaceID, spaceInfo.Hash, spaceInfo.LastCommittedPageNum)
 	}
 }
 
@@ -261,13 +272,14 @@ func (rp *Replica) SyncSpace(spaceID string, pageNum int64) error {
 			return err
 		}
 
-		log.Println("page buffer: ", string(response.Payload))
+		log.Println("page buffer size: ", len(response.Payload))
 		page, err := model.DecodePage(response.Payload)
 		if err != nil {
 			log.Fatalf("invalid page received, failed to decod page: %s", err.Error())
 			return err
 		}
 
+		log.Printf("page for space %s", page.SpaceID)
 		err = rp.HandleBroadcastPage(page)
 		if err != nil {
 			return err
@@ -289,12 +301,8 @@ func (rp *Replica) SyncAllSpaces(oracleSpaces map[string]model.SpaceInfo) error 
 			if err != nil {
 				return err
 			}
-		} else {
-			log.Printf("space %s is up to date", spaceID)
-		}
+		} 
 	}
-	
-	log.Println("successfull synced with all space data from oracle node")
 
 	return nil
 }

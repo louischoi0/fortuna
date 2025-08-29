@@ -9,6 +9,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"encoding/json"
 
 	C "fortuna/core/config"
 )
@@ -151,6 +152,7 @@ func (page *Page) Encode() ([]byte, error) {
 
 	var buf bytes.Buffer
 	buf.WriteString(hash)
+	buf.WriteString(page.SpaceID)
 	buf.Write(util.EncodeUint64(uint64(page.N)))
 	buf.Write(util.EncodeUint64(uint64(page.Timestamp)))
 
@@ -220,6 +222,11 @@ func DecodePage(b []byte) (*Page, error) {
 
 	// 1. page hash (skip validation)
 	_, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read page hash: %w", err)
+	}
+
+	spaceID, err := readFixedString(64) //TODO
 	if err != nil {
 		return nil, fmt.Errorf("read page hash: %w", err)
 	}
@@ -306,6 +313,7 @@ func DecodePage(b []byte) (*Page, error) {
 	}
 
 	page := &Page{
+		SpaceID:	     spaceID,
 		N:                   pageNum,
 		Timestamp:           ts,
 		PrevPageHash:        prevHash,
@@ -323,4 +331,16 @@ func DecodePage(b []byte) (*Page, error) {
 
 func (page *Page) GetPageNum() uint64 {
 	return page.N
+}
+
+func (page *Page) Show() string {
+	buf, err := json.Marshal(page)
+	if err != nil {
+		return ""
+	}
+
+	log.Println("----------------------------------------")
+	log.Printf(string(buf))
+	log.Println("----------------------------------------")
+	return string(buf)
 }
