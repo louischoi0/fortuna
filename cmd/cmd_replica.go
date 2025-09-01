@@ -22,14 +22,20 @@ func CreateReplicaRunCMD() *cobra.Command {
 
 			replica := service.NewReplica()
 			replica.ActivateIndexer()
+			replica.BootStrap()
+			replica.LoadUniverse()
 
 			err := replica.Connect(masterNodeAddr)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
 
-			replica.Run()
-			return nil
+			err = replica.SyncAllSpaces(true)
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+
+			return replica.Run()
 		},
 	}
 

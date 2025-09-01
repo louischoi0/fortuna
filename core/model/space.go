@@ -125,8 +125,9 @@ type Space struct {
 	SpaceID     string
 	CurrentPage *Page
 
-	LastPage             *Page
-	LastCommittedPageNum uint64
+	LastPage             	*Page
+	LastCommittedPageNum 	uint64
+	ActivePageNum		uint64
 
 	Pages       []*Page
 	Storage     *storage.FileStorage
@@ -134,13 +135,11 @@ type Space struct {
 	FileNum     uint64
 	CurrentFile *storage.File
 
-	PageNum        uint64
 	LastAppendedAt time.Time
 	IsReplica      bool
 }
 
 func NewSpace(spaceID string, metaDB *grocksdb.DB) *Space {
-	log.Printf("initailizing space %s", spaceID)
 
 	dir := filepath.Join(storage.DataRootDir(), fmt.Sprintf("space.%s", spaceID))
 	storage := storage.NewFileStorage(dir)
@@ -164,6 +163,7 @@ func NewSpace(spaceID string, metaDB *grocksdb.DB) *Space {
 		}
 		space.LoadSpaceData()
 		space.CommitSpaceHeader()
+		log.Printf("space %s loaded, pagenum: %v", spaceID, space.LastCommittedPageNum)
 		return space
 	}
 
@@ -176,8 +176,11 @@ func NewSpace(spaceID string, metaDB *grocksdb.DB) *Space {
 		meta:        metaDB,
 		Storage:     storage,
 		IsReplica:   false,
+		LastCommittedPageNum: 0,
+		ActivePageNum: 1,
 	}
 
+	log.Printf("initailized space %s, pagenum: %v", spaceID, space.LastCommittedPageNum)
 	space.CommitSpaceHeader()
 	return space
 }
@@ -205,7 +208,7 @@ func (s *Space) LoadSpaceData() error {
 
 	s.LastCommittedPageNum = pageNum
 	s.CurrentPage = NewPage(s.SpaceID, pageNum+1, s.LastPage)
-	s.PageNum = pageNum + 1
+	s.ActivePageNum = pageNum + 1
 
 	return nil
 }
@@ -249,6 +252,8 @@ func (s *Space) CommitCurrentPage() (*Page, error) {
 	defer s.mu.Unlock()
 
 	page := s.CurrentPage
+	page.Update()
+
 	log.Printf("start to commit current page: %s", s.SpaceID)
 
 	if s.ReadLastPageNum() != page.GetPageNum()-1 {
@@ -295,6 +300,8 @@ func (s *Space) CommitCurrentPage() (*Page, error) {
 	}
 
 	s.LastPage = page
+	page.Committed = true
+
 	s.LastCommittedPageNum = page.GetPageNum()
 
 	s.CurrentPage = NewPage(s.SpaceID, page.GetPageNum()+1, s.LastPage)
@@ -351,6 +358,7 @@ func ReadPage(db *grocksdb.DB, storage *storage.FileStorage, num uint64) (*Page,
 		return nil, err
 	}
 
+	page.Update()
 	return page, nil
 }
 
@@ -451,7 +459,7 @@ func (s *Space) Hash() string {
 func (s *Space) Info() SpaceInfo {
 	return SpaceInfo{
 		Hash:                 s.Hash(),
-		ActivePageNum:        int64(s.PageNum),
+		ActivePageNum:        int64(s.ActivePageNum),
 		LastCommittedPageNum: int64(s.LastCommittedPageNum),
 	}
 }
@@ -459,7 +467,7 @@ func (s *Space) Info() SpaceInfo {
 func (s *Space) CommitSpaceHeader() error {
 	log.Printf("commiting space header for %s", s.SpaceID)
 
-	err := rock.SetValue(s.meta, fmt.Sprintf("space-%v", s.SpaceID), util.EncodeUint64(s.PageNum))
+	err := rock.SetValue(s.meta, fmt.Sprintf("space-%v", s.SpaceID), util.EncodeUint64(s.LastCommittedPageNum))
 	if err != nil {
 		log.Fatalf("failed to set space id: %v", err.Error())
 	}

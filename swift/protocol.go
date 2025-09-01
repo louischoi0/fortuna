@@ -42,6 +42,15 @@ const (
 
 	PacketTypeReplicaGetSpacePageNumRequest  PacketType = 0x27
 	PacketTypeReplicaGetSpacePageNumResponse PacketType = 0x28
+
+
+
+	// Replica Server API
+	PacketTypeGetEventCountsRequest 	PacketType = 0x30
+	PacketTypeGetEventCountsResponse 	PacketType = 0x3a
+
+	PacketTypeGetEventDetailRequest  PacketType = 0x3b
+	PacketTypeGetEventDetailResponse PacketType = 0x3c
 )
 
 type Packet struct {

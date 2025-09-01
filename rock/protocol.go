@@ -64,7 +64,7 @@ func GetDBInstance(key string) (*grocksdb.DB, error) {
 	})
 
 	if initErr != nil {
-		return nil, fmt.Errorf("failed to initialize DB for key %s: %v", key, initErr)
+		log.Fatalf("failed to initialize DB for key %s: %v", key, initErr)
 	}
 
 	dbsMutex.RLock()

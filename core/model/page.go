@@ -23,6 +23,7 @@ type Page struct {
 	N            uint64
 	PrevPageHash string
 	PrevPage     *Page
+	Committed	bool
 
 	ExecutionRootHash   string
 	TransactionRootHash string
@@ -50,6 +51,7 @@ func NewPage(spaceID string, pageNum uint64, prevPage *Page) *Page {
 		TransactionRootHash: C.ZERO_HASH,
 		ExecutionRootHash:   C.ZERO_HASH,
 		UniverseHash:        C.ZERO_HASH,
+		Committed: 	     false,
 	}
 }
 
@@ -87,6 +89,10 @@ func (page *Page) Hash() string {
 }
 
 func (page *Page) UpdateTransactionRoot() {
+	if page.Committed {
+		log.Fatalf("updating hash committed page is not allowed")
+	}
+
 	if len(page.Transactions) == 0 {
 		page.TransactionRootHash = C.ZERO_HASH
 		return
@@ -104,6 +110,10 @@ func (page *Page) UpdateTransactionRoot() {
 }
 
 func (page *Page) UpdateExecutionRoot() {
+	if page.Committed {
+		log.Fatalf("updating hash committed page is not allowed")
+	}
+
 	if len(page.Executions) == 0 {
 		page.ExecutionRootHash = C.ZERO_HASH
 		return
@@ -327,6 +337,14 @@ func DecodePage(b []byte) (*Page, error) {
 	page.UpdateTransactionRoot()
 
 	return page, nil
+}
+
+func (page *Page) Update() {
+	if page.Committed {
+		log.Fatalf("updating hash committed page is not allowed")
+	}
+	page.UpdateExecutionRoot()
+	page.UpdateTransactionRoot()
 }
 
 func (page *Page) GetPageNum() uint64 {

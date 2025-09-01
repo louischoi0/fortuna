@@ -217,10 +217,13 @@ func (o *Oracle) RegisterHandlers() error {
 			return o.swift.SendErrorResponse(ctx, err.Error())
 		}
 
-		npage, ok := o.spacePageNums[req.SpaceID]
-		if !ok {
-			return o.swift.SendErrorResponse(ctx, fmt.Sprintf("space %s does not exists", req.SpaceID))
+		space, err := o.GetSpace(req.SpaceID)
+
+		if err != nil {
+			return o.swift.SendErrorResponse(ctx, err.Error())
 		}
+
+		npage := space.LastCommittedPageNum
 
 		buf, err := json.Marshal(npage)
 		if err != nil {
@@ -254,7 +257,7 @@ func (o *Oracle) RegisterHandlers() error {
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
 		}
-		log.Println("buffer size: ", len(buffer))
+		log.Printf("oracle broad cast page %s, previoushash: %s, num: %d, buffer size: %d", page.Hash(), page.PrevPageHash, page.N,  len(buffer))
 
 		response := &swift.Packet{
 			Type:    swift.PacketTypeReplicaPageResponse,

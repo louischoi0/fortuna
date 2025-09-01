@@ -44,7 +44,6 @@ type Oracle struct {
 	metaDB *grocksdb.DB
 
 	Universe      map[string]*model.Space
-	spacePageNums map[string]uint64
 
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction
@@ -101,14 +100,6 @@ func (o *Oracle) GetSynapse(spaceID string) *component.Synapse {
 	return syn
 }
 
-func (o *Oracle) InitSpacePageNumsMap() error {
-	for spaceID := range o.spacePageNums {
-		space, _ := o.GetSpace(spaceID)
-		o.spacePageNums[spaceID] = space.PageNum
-	}
-	return nil
-}
-
 func (o *Oracle) AllocateSpace(spaceID string, metaDB *grocksdb.DB) (*model.Space, error) {
 	if _, exists := o.Universe[spaceID]; exists {
 		return nil, fmt.Errorf("spaceID %s already exists", spaceID)
@@ -129,7 +120,6 @@ func (o *Oracle) AllocateSpace(spaceID string, metaDB *grocksdb.DB) (*model.Spac
 
 	o.synapses[spaceID] = syn
 	o.dbs[spaceID] = db
-	o.spacePageNums[spaceID] = 0
 
 	return space, nil
 }
@@ -146,7 +136,7 @@ func (o *Oracle) ListSpaces() ([]string, error) {
 func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleConfig) *Oracle {
 	oracleOnce.Do(func() {
 		swift := swift.NewServer()
-		metaDB, err := rock.GetDBInstance(fmt.Sprintf("space_additional.%s", initialSpaceID))
+		metaDB, err := rock.GetDBInstance(fmt.Sprintf("metastore.%s", oracleNodeID))
 
 		if err != nil {
 			log.Fatalf("failed to get space meta db: %v", err.Error())
@@ -160,7 +150,6 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 			swift:             swift,
 			synapses:          make(map[string]*component.Synapse),
 			Universe:          make(map[string]*model.Space),
-			spacePageNums:     make(map[string]uint64),
 			replicas:          make(map[string]replicaInfo),
 		}
 
@@ -243,8 +232,7 @@ func (o *Oracle) HandleEventResultBuffer(event *model.EventResult) error {
 		return nil
 	}
 
-	log.Println("set space page num map for space %s = %v", spaceID, uint64(space.PageNum))
-	o.spacePageNums[spaceID] = uint64(space.PageNum)
+	log.Println("set space page num map for space %s = %v", spaceID, uint64(space.LastCommittedPageNum))
 	o.pageSignal <- npage
 
 	return nil
@@ -294,7 +282,6 @@ func (o *Oracle) Run(port int) error {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	o.InitSpacePageNumsMap()
 	go o.Daemon()
 
 	<-sigChan

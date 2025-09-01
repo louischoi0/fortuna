@@ -24,10 +24,24 @@ type SpaceIndexer struct {
 	dbs       map[string]*grocksdb.DB
 	indexerDB *grocksdb.DB
 
-	eventIndicies map[string]map[string]*EventIndex
-	events        map[string]map[string]*model.EventResult
+	eventIndicies 	map[string]map[string]*EventIndex
+	events        	map[string]map[string]*model.EventResult
+
+				// EventID <-> SpaceID
+	eventSpaceIDMappingCache	map[string]string
+	eventCache		map[string]*model.EventResult
+
+	eventCounts	map[string]int64
 
 	//TODO snapshots
+}
+
+func (si *SpaceIndexer) GetExecutionInfo(eventID string) (*model.EventResult, error) {
+	ex, ok := si.eventCache[eventID]
+	if !ok {
+		return nil, fmt.Errorf("event %s not found", eventID)
+	}
+	return ex, nil
 }
 
 type MachineStateSnapshot struct {
@@ -49,6 +63,9 @@ func NewSpaceIndexer(universe map[string]*model.Space, dbs map[string]*grocksdb.
 		indexerDB:     db,
 		eventIndicies: make(map[string]map[string]*EventIndex),
 		events:        make(map[string]map[string]*model.EventResult),
+		eventCounts:   make(map[string]int64),
+		eventSpaceIDMappingCache: make(map[string]string),
+		eventCache: make(map[string]*model.EventResult),
 	}
 }
 
@@ -105,21 +122,50 @@ func (si *SpaceIndexer) ScanPages(pages []*model.Page) error {
 	return nil
 }
 
+func (si *SpaceIndexer) AddExecution(pageNum uint64, execution *model.EventResult) {
+	eventID := execution.Event.ID
+	spaceID := execution.Event.SpaceID
+
+	if _, ok := si.eventIndicies[spaceID]; !ok{
+		si.eventIndicies[spaceID] = make(map[string]*EventIndex)
+	}
+
+	if _, ok := si.events[spaceID]; !ok {
+		si.events[spaceID] = make(map[string]*model.EventResult)
+	}
+
+	si.eventIndicies[spaceID][eventID] = &EventIndex{
+		EventID: eventID,
+		SpaceID: spaceID,
+		PageNum: pageNum,
+		Length:  0,
+		Hash:    execution.Hash(),
+	}
+
+	si.events[spaceID][eventID] = execution
+	c, ok := si.eventCounts[spaceID]
+	if !ok {
+		c = 0
+	}
+
+	si.eventCounts[spaceID] = c + 1
+	si.eventSpaceIDMappingCache[eventID] = spaceID
+	si.eventCache[eventID] = execution
+}
+
 func (si *SpaceIndexer) ScanPage(page *model.Page) error {
-	spaceID := page.SpaceID
 	pageNum := page.GetPageNum()
 
 	for _, execution := range page.Executions {
-		eventID := execution.Event.ID
-		si.eventIndicies[spaceID][eventID] = &EventIndex{
-			EventID: eventID,
-			SpaceID: spaceID,
-			PageNum: pageNum,
-			Length:  0,
-			Hash:    execution.Hash(),
-		}
-		si.events[spaceID][eventID] = execution
+		si.AddExecution(pageNum, execution)
 	}
 
 	return nil
 }
+
+func (si *SpaceIndexer) GetEventCounts() map[string]int64 {
+	return si.eventCounts
+}
+
+
+

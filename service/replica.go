@@ -23,7 +23,6 @@ type Replica struct {
 	mu            sync.Mutex
 	metaDB        *grocksdb.DB
 	Universe      map[string]*model.Space
-	SpacePageNums map[string]int64
 
 	conn      net.Conn
 	connected bool
@@ -36,12 +35,19 @@ type Replica struct {
 
 func NewReplica() *Replica {
 	swift := swift.NewServer()
+
+	
+	metaDB, err := rock.GetDBInstance(fmt.Sprintf("metastore.%s", "replica"))
+        if err != nil {
+        	log.Fatalf("failed to get space meta db: %v", err.Error())
+        }
+
 	return &Replica{
-		swift:         swift,
-		Universe:      make(map[string]*model.Space),
-		connected:     false,
-		dbs:           make(map[string]*grocksdb.DB),
-		SpacePageNums: make(map[string]int64),
+		swift:         	swift,
+		metaDB:		metaDB,
+		Universe:      	make(map[string]*model.Space),
+		connected:     	false,
+		dbs:           	make(map[string]*grocksdb.DB),
 	}
 }
 
@@ -77,9 +83,16 @@ func (rp *Replica) AllocateSpace(spaceID string) (*model.Space, error) {
 	}
 
 	rp.dbs[spaceID] = db
-	rp.SpacePageNums[spaceID] = 0
 
 	return space, nil
+}
+
+func (rp *Replica) GetSpaceLCNum(spaceID string) uint64 {
+	space, ok := rp.Universe[spaceID]
+	if !ok {
+		return 0
+	}
+	return space.LastCommittedPageNum
 }
 
 func (rp *Replica) GetSpace(spaceID string) *model.Space {
@@ -97,10 +110,22 @@ func (rp *Replica) GetSpace(spaceID string) *model.Space {
 }
 
 func (rp *Replica) HandleBroadcastPage(page *model.Page) error {
+	page.Update()
+
 	space := rp.GetSpace(page.SpaceID)
+	log.Printf("replica received page hash: %s, num: %d", page.Hash(), page.N)
+
+	if page.GetPageNum() != space.LastCommittedPageNum + 1{
+		log.Fatalf("page num does not matched expected %v, but %v", space.LastCommittedPageNum + 1, page.GetPageNum())
+	}
+
 	space.CurrentPage = page
 	_, err := space.CommitCurrentPage()
-	rp.SpacePageNums[page.SpaceID] = int64(page.GetPageNum())
+
+	if rp.indexer != nil {
+		rp.indexer.ScanPage(page)
+	}
+	
 	return err
 }
 
@@ -182,14 +207,7 @@ func (rp *Replica) Run() error {
 		log.Fatalf("replica not connected")
 	}
 
-	info, err := rp.GetOracleUniverseInfo()
-	if err != nil {
-		return err
-	}
-
-	rp.LogUniverseInfo(info)
-
-	err = rp.SyncAllSpaces(info.Spaces)
+	err := rp.SyncAllSpaces(false)
 	if err != nil {
 		log.Fatalf("failed to sync all spaces before running replica service: %s", err.Error())
 	}
@@ -205,13 +223,7 @@ func (rp *Replica) Run() error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ping.C:
-			info, err := rp.GetOracleUniverseInfo()
-
-			if err != nil {
-				log.Fatalf("failed to get universe info from oracle: %s", err.Error())
-			}
-
-			err = rp.SyncAllSpaces(info.Spaces)
+			err = rp.SyncAllSpaces(false)
 			if err != nil {
 				log.Fatalf("failed to sync: %s", err.Error())
 			}
@@ -221,7 +233,7 @@ func (rp *Replica) Run() error {
 
 func (rp *Replica) LogUniverseInfo(info *UniverseInfo) {
 	for spaceID, spaceInfo := range info.Spaces {
-		log.Printf("space %s - hash: %s, page num: %d", spaceID, spaceInfo.Hash, spaceInfo.LastCommittedPageNum)
+		log.Printf("master node space %s - hash: %s, page num: %d", spaceID, spaceInfo.Hash, spaceInfo.LastCommittedPageNum)
 	}
 }
 
@@ -263,7 +275,7 @@ func (rp *Replica) CheckSpaceUptoDate(spaceID string) (bool, int64, error) {
 	}
 
 	if err := swift.AssertPacketType(response, swift.PacketTypeReplicaGetSpacePageNumResponse); err != nil {
-		return false, 0, err
+		log.Fatalf(err.Error())
 	}
 
 	var originPageNum int64
@@ -272,14 +284,20 @@ func (rp *Replica) CheckSpaceUptoDate(spaceID string) (bool, int64, error) {
 		return false, 0, err
 	}
 
-	return originPageNum == rp.SpacePageNums[spaceID], originPageNum, nil
+	lcn := rp.GetSpaceLCNum(spaceID)
+	if int64(lcn) > originPageNum {
+		log.Fatalf("replica page num higher than master")
+	}
+
+	return originPageNum == int64(lcn), originPageNum, nil
 }
 
 func (rp *Replica) SyncSpace(spaceID string, pageNum int64) error {
 
-	for i := rp.SpacePageNums[spaceID]; i < pageNum; i++ {
+	for i := rp.GetSpaceLCNum(spaceID); int64(i) < pageNum; i++ {
 		log.Printf("request space page for %s:%v", spaceID, i+1)
-		packet := swift.NewReplicaPageRequest(spaceID, i+1)
+		packet := swift.NewReplicaPageRequest(spaceID, int64(i)+1)
+
 		if err := rpc.SendPacket(rp.conn, packet); err != nil {
 			return err
 		}
@@ -310,14 +328,37 @@ func (rp *Replica) SyncSpace(spaceID string, pageNum int64) error {
 	return nil
 }
 
-func (rp *Replica) SyncAllSpaces(oracleSpaces map[string]model.SpaceInfo) error {
+func (rp *Replica) SyncAllSpaces(debugLogging bool) error {
 
-	for spaceID, _ := range oracleSpaces {
+	info, err := rp.GetOracleUniverseInfo()
+	if err != nil {
+		return err
+	}
+
+	if debugLogging{
+		rp.LogUniverseInfo(info)
+	}
+
+	for spaceID, _ := range info.Spaces {
+		space := rp.GetSpace(spaceID)
+		if space == nil {
+			log.Fatalf("space %s expected to exists", spaceID)
+		}
+
+		if debugLogging {
+			log.Printf("start to sync space %s", spaceID)
+		}
+
 		upToDate, pageNum, err := rp.CheckSpaceUptoDate(spaceID)
+		
+		if debugLogging {
+			log.Printf("master space pagenum: %v, uptodate: %v", pageNum, upToDate)
+		}
+
 		if err != nil {
-			return err
+			log.Fatalf(err.Error())
 		} else if !upToDate {
-			log.Printf("space %s is not up to date, start syncing to page %d", spaceID, pageNum)
+			log.Printf("space %s is not up to date, start syncing from page %d to page %d", spaceID, space.LastCommittedPageNum, pageNum)
 			err := rp.SyncSpace(spaceID, pageNum)
 			if err != nil {
 				return err
@@ -326,4 +367,32 @@ func (rp *Replica) SyncAllSpaces(oracleSpaces map[string]model.SpaceInfo) error 
 	}
 
 	return nil
+}
+
+func (rp *Replica) BootStrap() {
+	log.Printf("registering replica handlers")
+
+	rp.swift.RegisterHandler(swift.PacketTypeGetEventCountsRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		if rp.indexer == nil {
+			return rp.swift.SendErrorResponse(ctx, "replica indexer is not activated")
+		}
+
+		em := rp.indexer.GetEventCounts()
+		buf, _ := json.Marshal(em)
+
+		response := &swift.Packet{
+			Type:    swift.PacketTypeGetEventCountsResponse,
+			Payload: buf,
+		}
+
+		return rp.swift.Send(ctx, response)
+	})
+
+	rp.swift.RegisterHandler(swift.PacketTypeGetEventDetailRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		// eventID := string(packet.Payload)
+		// info := rp.indexer.GetExecutionInfo(eventID)
+
+		return nil
+	})
+
 }
