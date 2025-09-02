@@ -12,6 +12,7 @@ import (
 )
 
 var MetastoreRootDir = "data"
+var LOGGING = false
 
 func MetaStoreDataRootDir() string {
 	return MetastoreRootDir
@@ -96,13 +97,16 @@ func ClearDB(db *grocksdb.DB) error {
 }
 
 func SetValue(db *grocksdb.DB, key string, value []byte) error {
-	log.Printf("rock set - key: %s, size: %v", key, len(value))
+	if LOGGING {
+		log.Printf("rock set - key: %s, size: %v", key, len(value))
+	}
+
 	writeOpts := grocksdb.NewDefaultWriteOptions()
 	defer writeOpts.Destroy()
 
 	err := db.Put(writeOpts, []byte(key), value)
 	if err != nil {
-		log.Printf("Failed to write key %s: %v", key, err)
+		log.Fatalf("Failed to write key %s: %v", key, err)
 	}
 	return err
 }

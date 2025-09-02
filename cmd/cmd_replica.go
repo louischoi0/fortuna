@@ -21,9 +21,9 @@ func CreateReplicaRunCMD() *cobra.Command {
 			rock.SetMetastoreDataRootDir(data_dir)
 
 			replica := service.NewReplica()
-			replica.ActivateIndexer()
 			replica.BootStrap()
 			replica.LoadUniverse()
+			replica.ActivateIndexer()
 
 			err := replica.Connect(masterNodeAddr)
 			if err != nil {

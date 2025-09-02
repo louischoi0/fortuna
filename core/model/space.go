@@ -140,7 +140,7 @@ type Space struct {
 }
 
 func NewSpace(spaceID string, metaDB *grocksdb.DB) *Space {
-
+	log.Printf("creating space instance %s", spaceID)
 	dir := filepath.Join(storage.DataRootDir(), fmt.Sprintf("space.%s", spaceID))
 	storage := storage.NewFileStorage(dir)
 
@@ -306,6 +306,11 @@ func (s *Space) CommitCurrentPage() (*Page, error) {
 
 	s.CurrentPage = NewPage(s.SpaceID, page.GetPageNum()+1, s.LastPage)
 	s.LastAppendedAt = time.Now()
+	s.Pages = append(s.Pages, page)
+
+	if int(page.GetPageNum()) != len(s.Pages) {
+		log.Fatalf("pages list mismatched with page.num")
+	}
 
 	return page, nil
 }
@@ -346,7 +351,7 @@ func ReadPage(db *grocksdb.DB, storage *storage.FileStorage, num uint64) (*Page,
 	fileName := GetFileName(blockNum)
 	file := storage.GetOrOpenFile(fileName)
 
-	log.Printf("read page %v offset: %v size: %v", num, pageIndex.Offset, pageIndex.Size)
+	log.Printf("read page %v - file: %s, offset: %v, size: %v", num, file.Path, pageIndex.Offset, pageIndex.Size)
 
 	pageBytes, err := file.OffsetRead(int64(pageIndex.Offset), int64(pageIndex.Size))
 	if err != nil {
@@ -477,7 +482,7 @@ func (s *Space) CommitSpaceHeader() error {
 
 func ListSpaces(db *grocksdb.DB) ([]string, error) {
 	cb := func(key string, value []byte) string {
-		return key
+		return key[6:]
 	}
 
 	return rock.ScanC(db, "space-", cb)

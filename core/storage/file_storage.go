@@ -54,12 +54,12 @@ func (fs *FileStorage) Close() error {
 }
 
 type File struct {
-	mu      sync.Mutex
-	Storage *FileStorage
-	Name    string
-	Path    string
-	f       *os.File
-	removed bool
+	mu      	sync.Mutex
+	Storage 	*FileStorage
+	Name    	string
+	Path    	string
+	f       	*os.File
+	removed 	bool
 }
 
 func NewFile(storage *FileStorage, name string) *File {
@@ -76,6 +76,7 @@ func NewFile(storage *FileStorage, name string) *File {
 		removed: false,
 		f:       f,
 	}
+
 	return file
 }
 

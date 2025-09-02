@@ -34,8 +34,8 @@ type Replica struct {
 }
 
 func NewReplica() *Replica {
+	log.Println("creating replica instance")
 	swift := swift.NewServer()
-
 	
 	metaDB, err := rock.GetDBInstance(fmt.Sprintf("metastore.%s", "replica"))
         if err != nil {
@@ -52,6 +52,7 @@ func NewReplica() *Replica {
 }
 
 func (rp *Replica) LoadUniverse() error {
+	log.Println("load universe")
 	spaces, err := model.ListSpaces(rp.metaDB)
 	if err != nil {
 		return err
@@ -66,6 +67,11 @@ func (rp *Replica) LoadUniverse() error {
 func (rp *Replica) ActivateIndexer() *SpaceIndexer {
 	log.Printf("activating replica event indexer %s", rp.ID)
 	rp.indexer = NewSpaceIndexer(rp.Universe, rp.dbs)
+
+	for _, space := range rp.Universe {
+		rp.indexer.ScanPages(space.Pages)
+	}
+
 	return rp.indexer
 }
 
@@ -382,6 +388,28 @@ func (rp *Replica) BootStrap() {
 
 		response := &swift.Packet{
 			Type:    swift.PacketTypeGetEventCountsResponse,
+			Payload: buf,
+		}
+
+		return rp.swift.Send(ctx, response)
+	})
+
+	rp.swift.RegisterHandler(swift.PacketTypeListEventsRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		var req struct {
+			SpaceID	string 	`json:"space_id"`
+			Count	int	`json:"count"`	
+		}
+
+		err := json.Unmarshal(packet.Payload, &req)
+		if err != nil {
+			return rp.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		events := rp.indexer.ListEvents(req.SpaceID, 10)
+		buf, _ := json.Marshal(events)
+
+		response := &swift.Packet{
+			Type:    swift.PacketTypeListEventsResponse,
 			Payload: buf,
 		}
 

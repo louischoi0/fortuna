@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"fortuna/core/model"
 	"fortuna/rock"
+	"fortuna/util"
 	"log"
 	"sync"
 
@@ -19,10 +20,10 @@ type EventIndex struct {
 }
 
 type SpaceIndexer struct {
-	mu        sync.Mutex
-	Universe  map[string]*model.Space
-	dbs       map[string]*grocksdb.DB
-	indexerDB *grocksdb.DB
+	mu        	sync.Mutex
+	Universe  	map[string]*model.Space
+	dbs       	map[string]*grocksdb.DB
+	indexerDB 	*grocksdb.DB
 
 	eventIndicies 	map[string]map[string]*EventIndex
 	events        	map[string]map[string]*model.EventResult
@@ -32,7 +33,6 @@ type SpaceIndexer struct {
 	eventCache		map[string]*model.EventResult
 
 	eventCounts	map[string]int64
-
 	//TODO snapshots
 }
 
@@ -81,7 +81,6 @@ func (si *SpaceIndexer) SelectMachineStateSnapshot(machineID string, spaceID str
 }
 
 func (si *SpaceIndexer) ReadEvent(eventID string) (*model.EventResult, error) {
-
 	return nil, nil
 }
 
@@ -112,15 +111,41 @@ func (si *SpaceIndexer) ReadPage(spaceID string, pageNum int64) (*model.Page, er
 }
 
 func (si *SpaceIndexer) ScanPages(pages []*model.Page) error {
+
 	for _, page := range pages {
+		lcn, _ := si.GetLastIndexedPageNum(page.SpaceID)
+
+		if page.GetPageNum() <= lcn {
+			continue
+		}
+
 		err := si.ScanPage(page)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
+
+func (si *SpaceIndexer) SetLastIndexedPageNum(spaceID string, pageNum uint64) error {
+	return rock.SetValue(si.indexerDB, "last_indexed_page", util.EncodeUint64(pageNum))
+}
+
+func (si *SpaceIndexer) GetLastIndexedPageNum(spaceID string) (uint64, error) {
+	buf, err := rock.GetValue(si.indexerDB, "last_indexed_page")
+	if err != nil {
+		return 0, err
+	}
+	
+	i, err := util.DecodeUint64(buf)
+
+	if err != nil {
+		return 0, err
+	}
+	
+	return i, nil
+}
+
 
 func (si *SpaceIndexer) AddExecution(pageNum uint64, execution *model.EventResult) {
 	eventID := execution.Event.ID
@@ -154,7 +179,10 @@ func (si *SpaceIndexer) AddExecution(pageNum uint64, execution *model.EventResul
 }
 
 func (si *SpaceIndexer) ScanPage(page *model.Page) error {
+	log.Printf("indexer scan page %s:%d", page.SpaceID, page.N)
+
 	pageNum := page.GetPageNum()
+	defer si.SetLastIndexedPageNum(page.SpaceID, pageNum)
 
 	for _, execution := range page.Executions {
 		si.AddExecution(pageNum, execution)
@@ -166,6 +194,4 @@ func (si *SpaceIndexer) ScanPage(page *model.Page) error {
 func (si *SpaceIndexer) GetEventCounts() map[string]int64 {
 	return si.eventCounts
 }
-
-
 

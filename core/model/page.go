@@ -233,17 +233,17 @@ func DecodePage(b []byte) (*Page, error) {
 	// 1. page hash (skip validation)
 	_, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
-		return nil, fmt.Errorf("read page hash: %w", err)
+		return nil, err
 	}
 
 	spaceID, err := readFixedString(64) //TODO
 	if err != nil {
-		return nil, fmt.Errorf("read page hash: %w", err)
+		return nil, err
 	}
 
 	pageNum, err := readU64LE()
 	if err != nil {
-		return nil, fmt.Errorf("read page num: %w", err)
+		return nil, err
 	}
 
 	// 2. timestamp
