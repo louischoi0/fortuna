@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"fortuna/rpc"
 	"fortuna/structure"
 	"fortuna/swift"
@@ -84,6 +85,47 @@ func CreateUniverseInfoAPI() *cobra.Command {
 	return cmd
 }
 
+func CreateListEventsAPI() *cobra.Command {
+	var spaceID  string
+	var endpoint string
+
+	cmd := &cobra.Command{
+		Use:   "events",
+		Short: "events",
+		Args:  cobra.NoArgs,
+
+		Run: func(cmd *cobra.Command, args []string) {
+			payload := struct {
+				SpaceID string 	`json:"space_id"`
+				Count	int	`json:"count"`
+			} {
+				SpaceID: spaceID,
+				Count: 100,
+			}
+
+			buf, err := json.Marshal(payload)
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+
+			request := rpc.CreateRequest(swift.PacketTypeListEventsRequest, endpoint, string(buf))
+			response, err := request.Call()
+
+			if err != nil {
+				fmt.Println("error: ", err.Error())
+			} else {
+				buf := swift.FormatJSONResponse(response.Payload)
+				fmt.Println(buf)
+			}
+		},
+	}
+
+	cmd.Flags().StringVarP(&spaceID, "space_id", "s", "0000000000000000000000000000000000000000000000000000000000000000", "spaceID")
+	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
+
+	return cmd
+}
+
 func CreateGenStateSeedAPI() *cobra.Command {
 	var kernel_version string
 	var payload string
@@ -125,6 +167,7 @@ func CreateAPICMD() *cobra.Command {
 	cmd.AddCommand(CreateGenStateSeedAPI())
 	cmd.AddCommand(CreateGenVectorAPI())
 	cmd.AddCommand(CreateUniverseInfoAPI())
+	cmd.AddCommand(CreateListEventsAPI())
 
 	return cmd
 }

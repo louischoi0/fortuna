@@ -375,7 +375,7 @@ func (rp *Replica) SyncAllSpaces(debugLogging bool) error {
 	return nil
 }
 
-func (rp *Replica) BootStrap() {
+func (rp *Replica) RegisterPacketHandler() {
 	log.Printf("registering replica handlers")
 
 	rp.swift.RegisterHandler(swift.PacketTypeGetEventCountsRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
@@ -405,7 +405,11 @@ func (rp *Replica) BootStrap() {
 			return rp.swift.SendErrorResponse(ctx, err.Error())
 		}
 
-		events := rp.indexer.ListEvents(req.SpaceID, 10)
+		events, err := rp.indexer.ListEvents(req.SpaceID, req.Count)
+		if err != nil {
+			return rp.swift.SendErrorResponse(ctx, err.Error())
+		}
+
 		buf, _ := json.Marshal(events)
 
 		response := &swift.Packet{
@@ -422,5 +426,18 @@ func (rp *Replica) BootStrap() {
 
 		return nil
 	})
+}
+
+func (rp *Replica) BootStrap() {
+	rp.LoadUniverse()
+	rp.ActivateIndexer()
+	rp.RegisterPacketHandler()
+}
+
+func (rp *Replica) RunServer(port int) {
+
+	if err := rp.swift.Start(port); err != nil {
+		log.Fatalf("Failed to start server: %v", err.Error())
+	}
 
 }

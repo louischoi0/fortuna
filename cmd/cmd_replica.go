@@ -16,14 +16,13 @@ func CreateReplicaRunCMD() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			masterNodeAddr, _ := cmd.Flags().GetString("maddr")
 			data_dir, _ := cmd.Flags().GetString("dir")
+			port, _ := cmd.Flags().GetInt("port")
 
 			storage.SetRootDir(data_dir)
 			rock.SetMetastoreDataRootDir(data_dir)
 
 			replica := service.NewReplica()
 			replica.BootStrap()
-			replica.LoadUniverse()
-			replica.ActivateIndexer()
 
 			err := replica.Connect(masterNodeAddr)
 			if err != nil {
@@ -35,12 +34,15 @@ func CreateReplicaRunCMD() *cobra.Command {
 				log.Fatalf(err.Error())
 			}
 
+			go replica.RunServer(port)
+
 			return replica.Run()
 		},
 	}
 
-	cmd.Flags().StringP("maddr", "a", CLI_DEFAULT_ENDPOINT, "endpoint")
-	cmd.Flags().StringP("dir", "d", "replica", "endpoint")
+	cmd.Flags().StringP("maddr", "a", CLI_DEFAULT_ENDPOINT, "master addr")
+	cmd.Flags().StringP("dir", "d", "replica", "replica directory")
+	cmd.Flags().IntP("port", "p", 9002, "port")
 	return cmd
 }
 

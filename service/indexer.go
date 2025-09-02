@@ -28,7 +28,7 @@ type SpaceIndexer struct {
 	eventIndicies 	map[string]map[string]*EventIndex
 	events        	map[string]map[string]*model.EventResult
 
-				// EventID <-> SpaceID
+	// EventID <-> SpaceID
 	eventSpaceIDMappingCache	map[string]string
 	eventCache		map[string]*model.EventResult
 
@@ -113,11 +113,13 @@ func (si *SpaceIndexer) ReadPage(spaceID string, pageNum int64) (*model.Page, er
 func (si *SpaceIndexer) ScanPages(pages []*model.Page) error {
 
 	for _, page := range pages {
+		/**
 		lcn, _ := si.GetLastIndexedPageNum(page.SpaceID)
 
 		if page.GetPageNum() <= lcn {
 			continue
 		}
+		**/
 
 		err := si.ScanPage(page)
 		if err != nil {
@@ -148,7 +150,8 @@ func (si *SpaceIndexer) GetLastIndexedPageNum(spaceID string) (uint64, error) {
 
 
 func (si *SpaceIndexer) AddExecution(pageNum uint64, execution *model.EventResult) {
-	eventID := execution.Event.ID
+	eventID := execution.Hash()
+
 	spaceID := execution.Event.SpaceID
 
 	if _, ok := si.eventIndicies[spaceID]; !ok{
@@ -189,6 +192,27 @@ func (si *SpaceIndexer) ScanPage(page *model.Page) error {
 	}
 
 	return nil
+}
+
+func (si *SpaceIndexer) ListEvents(spaceID string, count int) ([]*model.EventResult, error) {
+	spaceEvents, ok := si.events[spaceID]
+	if !ok {
+		return nil, fmt.Errorf("space %s events cache map does not exists", spaceID)
+	}
+
+	events := make([]*model.EventResult, 0, 100)
+	c := 0
+
+	for _, event := range(spaceEvents) {
+		events = append(events, event)
+
+		if c > count {
+			return events, nil
+		}
+		c = c + 1
+	}
+	
+	return events, nil
 }
 
 func (si *SpaceIndexer) GetEventCounts() map[string]int64 {

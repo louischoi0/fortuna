@@ -87,18 +87,18 @@ func NewEventSpecFromOrderedMap(data *structure.OrderedMap) (*EventSpec, error) 
 }
 
 type Event struct {
-	ID        string `json:"id"`
-	Timestamp uint64 `json:"timestamp"`
-	Publisher string `json:"publisher"`
-	SpaceID   string `json:"space_id"`
+	H		string `json:"hash"`
+	Timestamp 	uint64 `json:"timestamp"`
+	Publisher 	string `json:"publisher"`
+	SpaceID   	string `json:"space_id"`
 
-	Payload *structure.OrderedMap `json:"payload"`
-	Spec    *EventSpec            `json:"spec"`
+	Payload 	*structure.OrderedMap `json:"payload"`
+	Spec    	*EventSpec            `json:"spec"`
 
-	Topic     string `json:"topic"`
-	Subtopic  string `json:"subtopic"`
-	Seperator string `json:"seperator"`
-	Tag       string `json:"tag"`
+	Topic     	string `json:"topic"`
+	Subtopic  	string `json:"subtopic"`
+	Seperator 	string `json:"seperator"`
+	Tag       	string `json:"tag"`
 }
 
 // DecodeEvent decodes bytes produced by (*Event).Encode() back into an Event.
@@ -332,6 +332,7 @@ func NewEventRequest(publisher string, spaceID string, payload *structure.Ordere
 	}
 
 	return &Event{
+		Timestamp: util.GetCurrentTime(),
 		Publisher: publisher,
 		SpaceID:   spaceID,
 		Payload:   payload,
@@ -435,6 +436,7 @@ func NewEventFromOrderedMap(data *structure.OrderedMap) (*Event, error) {
 		Payload:   payload_s,
 		Topic:     topic_s,
 	}
+	event.H = event.Hash()
 
 	return &event, nil
 }
@@ -452,10 +454,10 @@ func (er *EventExecutionError) Map() *structure.OrderedMap {
 }
 
 type EventResult struct {
-	Event     *Event               `json:"event"`
-	EventHash string               `json:"event_hash"`
-	Result    string               `json:"result"`
-	Err       *EventExecutionError `json:"error"`
+	Event     	*Event               `json:"event"`
+	H		string               `json:"hash"`
+	Result    	string               `json:"result"`
+	Err       	*EventExecutionError `json:"error"`
 }
 
 func (xr *EventResult) GetSpaceID() string {
@@ -485,10 +487,12 @@ func (xr *EventResult) Hash() string {
 }
 
 func NewEventResultFromEvent(event *Event, result string) *EventResult {
+	event.H = event.Hash()
+
 	return &EventResult{
 		Event:     event,
 		Result:    result,
-		EventHash: event.Hash(),
+		H: event.Hash(),
 		Err:       nil,
 	}
 }
@@ -612,12 +616,10 @@ func DecodeEventResult(b []byte) (*EventResult, error) {
 	resultBytes := b[off : off+int(resultSize)]
 	result := string(resultBytes)
 
-	event_hash := event.Hash()
+	event.H = event.Hash()
 
-	// 4. Compose object
 	exec := &EventResult{
 		Event:     event,
-		EventHash: event_hash,
 		Result:    result,
 		Err:       nil, // not included in current encoding
 	}
@@ -626,5 +628,6 @@ func DecodeEventResult(b []byte) (*EventResult, error) {
 		return nil, fmt.Errorf("event result hash mismatched expected: %s, got: %s", hash, exec.Hash())
 	}
 
+	exec.H = hash
 	return exec, nil
 }
