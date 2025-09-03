@@ -7,6 +7,7 @@ import (
 )
 
 type Operation struct {
+	// TODO opcode to []byte
 	OpCode string
 	OpName string
 	Args   []interface{}
@@ -34,23 +35,23 @@ func SerializeCompactOperations(ops []*Operation) ([]byte, error) {
 func serializeVar(sb *bytes.Buffer, arg interface{}) error {
 	switch v := arg.(type) {
 	case string:
-		sb.WriteByte(STR_SYMBOL)
+		sb.Write(STR_SYMBOL)
 		sb.WriteString(v)
-		sb.WriteByte(STR_END_SYMBOL)
+		sb.Write(STR_END_SYMBOL)
 	case int:
-		sb.WriteByte(INT_SYMBOL)
+		sb.Write(INT_SYMBOL)
 		// TODO
 		sb.WriteString(strconv.FormatInt(int64(v), 10))
-		sb.WriteByte(INT_END_SYMBOL)
+		sb.Write(INT_END_SYMBOL)
 	case int64:
-		sb.WriteByte(INT_SYMBOL)
+		sb.Write(INT_SYMBOL)
 		// TODO
 		sb.WriteString(strconv.FormatInt(v, 10))
-		sb.WriteByte(INT_END_SYMBOL)
+		sb.Write(INT_END_SYMBOL)
 	case *StateVector:
-		sb.WriteByte(VEC_SYMBOL)
+		sb.Write(VEC_SYMBOL)
 		sb.Write(v.Encode())
-		sb.WriteByte(VEC_END_SYMBOL)
+		sb.Write(VEC_END_SYMBOL)
 	case *Var:
 		return serializeVar(sb, v.Value)
 	case *Operation:
@@ -68,15 +69,15 @@ func serializeOperation(sb *bytes.Buffer, op *Operation) error {
 		return fmt.Errorf("nil operation")
 	}
 
-	sb.WriteByte(OP_SYMBOL)
+	sb.Write(OP_SYMBOL)
 	sb.WriteString(op.OpCode)
 
 	for _, arg := range op.Args {
-		sb.WriteByte(ARG_MARK)
+		sb.Write(ARG_MARK)
 		if err := serializeVar(sb, arg); err != nil {
 			return err
 		}
 	}
-	sb.WriteByte(OP_END_SYMBOL)
+	sb.Write(OP_END_SYMBOL)
 	return nil
 }

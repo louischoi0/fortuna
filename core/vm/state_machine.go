@@ -2,6 +2,7 @@ package vm
 
 import (
 	"fortuna/core/model"
+	"fortuna/util"
 	"time"
 )
 
@@ -32,6 +33,7 @@ type StateMachine struct {
 
 func NewBasicStateMachine(space *model.Space, stateCount int64) *StateMachine {
 	machine := &StateMachine{
+		ID: MakeStateMachineID(space.SpaceID),
 		SpaceID:     space.SpaceID,
 		StateCount:  stateCount,
 		State:       model.NewStateVector(make([]int64, stateCount)),
@@ -77,5 +79,12 @@ func (machine *StateMachine) NewLogMachineStateTransaction() *model.Transaction 
 		From:    machine.ID,
 		// Params:  params,
 		Operations: subroutine.Operations,
+		Timestamp: util.Now(),
 	}
 }
+
+func MakeStateMachineID(spaceID string) string {
+	return util.ConcatHash("state_machine", spaceID)
+}
+
+

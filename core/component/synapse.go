@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"fortuna/core/model"
 	"fortuna/core/vm"
+	"fortuna/util"
 	"log"
 )
 
@@ -22,6 +23,7 @@ type Synapse struct {
 func NewSynapse(space *model.Space) *Synapse {
 
 	return &Synapse{
+		ID: MakeSynapseID(space.SpaceID),
 		Space:    space,
 		Epoch:    0,
 		machines: make(map[vm.KernelVersion]*vm.StateMachine),
@@ -29,13 +31,17 @@ func NewSynapse(space *model.Space) *Synapse {
 	}
 }
 
-func (n *Synapse) InitMachines() error {
+func (n *Synapse) InitMachines() ([]*model.Transaction, error) {
+	initMachineTxs := make([]*model.Transaction, 0, 8)
+	
 	machine := vm.NewBasicStateMachine(n.Space, 256)
 	machine.ResetState()
 
 	n.machines[vm.BaseV000] = machine
+	tx := machine.NewLogMachineStateTransaction()
+	initMachineTxs = append(initMachineTxs, tx)
 
-	return nil
+	return initMachineTxs, nil
 }
 
 func (n *Synapse) LoadMachine(kernel vm.KernelVersion) (*vm.StateMachine, error) {
@@ -80,10 +86,18 @@ func (n *Synapse) Init() {
 
 }
 
-func (n *Synapse) Bootstrap() error {
-	if err := n.InitMachines(); err != nil {
+func (n *Synapse) Bootstrap() ([]*model.Transaction, error) {
+	txs, err := n.InitMachines()
+
+	if err != nil {
 		log.Fatalf("Failed to init synapse: %v", err.Error())
 	}
 
-	return nil
+	return txs, nil
 }
+
+func MakeSynapseID(spaceID string) string {
+	return util.ConcatHash("synapse", spaceID)
+}
+
+

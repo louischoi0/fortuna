@@ -59,17 +59,18 @@ func (page *Page) GetCount() int {
 	return len(page.Executions) + len(page.Transactions)
 }
 
-func (page *Page) AppendTransactionExecution(tx *Transaction) {
+func (page *Page) AppendTransaction(tx *Transaction) {
 	page.mu.Lock()
 	defer page.mu.Unlock()
 
+	log.Printf("append raw transaction for page %v: %v", page.N, tx.Hash())
 	page.Transactions = append(page.Transactions, tx)
 }
 
 func (page *Page) AppendEventExecution(er *EventResult) {
-	log.Printf("append event execution for page %v: %v", page.N, er.Event.Hash())
 	page.mu.Lock()
 	defer page.mu.Unlock()
+	log.Printf("append event execution for page %v: %v", page.N, er.Hash())
 
 	page.Executions = append(page.Executions, er)
 }
@@ -292,7 +293,11 @@ func DecodePage(b []byte) (*Page, error) {
 		if err := need(int(sizeU)); err != nil {
 			return nil, fmt.Errorf("event buffer underflow: %w", err)
 		}
+
+
 		data := b[off : off+int(sizeU)]
+		log.Printf("read event from page size: %d, offset: %d, len: %d", int(sizeU), off, len(data))
+
 		off += int(sizeU)
 
 		evt, err := DecodeEventResult(data)
@@ -312,7 +317,10 @@ func DecodePage(b []byte) (*Page, error) {
 		if err := need(int(sizeU)); err != nil {
 			return nil, fmt.Errorf("tx buffer underflow: %w", err)
 		}
+
+
 		data := b[off : off+int(sizeU)]
+		log.Printf("read transaction from page size: %d, offset: %d, len: %d", int(sizeU), off, len(b))
 		off += int(sizeU)
 
 		tx, err := DecodeRawTransaction(data)

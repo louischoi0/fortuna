@@ -93,6 +93,7 @@ func (t *RawTransaction) UpdateRawCode() ([]byte, error) {
 
 func (rtx *RawTransaction) Encode() ([]byte, error) {
 	var buf bytes.Buffer
+	rtx.UpdateRawCode()
 
 	hash := rtx.Hash()
 	if len(hash) != C.MODEL_HASH_STR_LENGTH {
@@ -101,6 +102,7 @@ func (rtx *RawTransaction) Encode() ([]byte, error) {
 	if len(rtx.SpaceID) != C.SPACE_ID_STR_LENGTH {
 		return nil, fmt.Errorf("spaceID must have length %d", C.SPACE_ID_STR_LENGTH)
 	}
+
 	if len(rtx.From) != C.IDENTITY_ADDRESS_STR_LENGTH {
 		return nil, fmt.Errorf("from must have length %d", C.IDENTITY_ADDRESS_STR_LENGTH)
 	}
@@ -140,6 +142,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return nil
 	}
 	readFixedString := func(k int) (string, error) {
+		fmt.Printf("read fixed string %d, offset:%d\n", k, off)
 		if err := need(k); err != nil {
 			return "", err
 		}
@@ -179,6 +182,8 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return nil, fmt.Errorf("read from: %w", err)
 	}
 
+	fmt.Println("from: ", from)
+
 	if err := need(1); err != nil {
 		return nil, fmt.Errorf("read raw_code flag: %w", err)
 	}
@@ -186,7 +191,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 	off++
 
 	if rawCodeFlag != 1 {
-		return nil, fmt.Errorf("unexpected raw_code flag: %d", rawCodeFlag)
+		return nil, fmt.Errorf("unexpected raw_code flag: %d at %d:%d", rawCodeFlag, off-1, len(b))
 	}
 	rawCodeLen, err := readU64LE()
 	if err != nil {
@@ -213,7 +218,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 	if err := need(int(opLen)); err != nil {
 		return nil, fmt.Errorf("read ops body: %w", err)
 	}
-	opCode := string(b[off : off+int(opLen)])
+	opCode := b[off : off+int(opLen)]
 	off += int(opLen)
 
 	ops, err := ParseCompactOperations(opCode)

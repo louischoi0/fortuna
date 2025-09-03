@@ -100,17 +100,19 @@ func (o *Oracle) GetSynapse(spaceID string) *component.Synapse {
 	return syn
 }
 
-func (o *Oracle) AllocateSpace(spaceID string, metaDB *grocksdb.DB) (*model.Space, error) {
+func (o *Oracle) AllocateSpace(spaceID string, metaDB *grocksdb.DB) ([]*model.Transaction, *model.Space, error) {
 	if _, exists := o.Universe[spaceID]; exists {
-		return nil, fmt.Errorf("spaceID %s already exists", spaceID)
+		return nil, nil, fmt.Errorf("spaceID %s already exists", spaceID)
 	}
 
 	space := model.NewSpace(spaceID, metaDB)
 	o.Universe[spaceID] = space
 
 	syn := component.NewSynapse(space)
-	if err := syn.Bootstrap(); err != nil {
-		return nil, fmt.Errorf("failed to bootstrap synapse: %v", err.Error())
+	txs, err := syn.Bootstrap() 
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to bootstrap synapse: %v", err.Error())
 	}
 
 	db, err := rock.GetDBInstance(fmt.Sprintf("meta.%s", spaceID))
@@ -121,7 +123,7 @@ func (o *Oracle) AllocateSpace(spaceID string, metaDB *grocksdb.DB) (*model.Spac
 	o.synapses[spaceID] = syn
 	o.dbs[spaceID] = db
 
-	return space, nil
+	return txs, space, nil
 }
 
 func (o *Oracle) ListSpaces() ([]string, error) {
@@ -153,10 +155,12 @@ func GetOracleService(oracleNodeID string, initialSpaceID string, config OracleC
 			replicas:          make(map[string]replicaInfo),
 		}
 
-		_, err = oracle.AllocateSpace(initialSpaceID, metaDB)
+		txs, _, err := oracle.AllocateSpace(initialSpaceID, metaDB)
 		if err != nil {
 			log.Fatalf("failed to allocate space: %v", err.Error())
 		}
+
+		oracle.HandleTransactions(txs)
 	})
 
 	return oracle
@@ -270,13 +274,29 @@ func (o *Oracle) Shutdown() error {
 	return nil
 }
 
+func (o *Oracle) HandleTransactions(txs []*model.Transaction) error {
+
+	for _, tx := range(txs) {
+		space, err := o.GetSpace(tx.SpaceID)
+
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
+
+		space.CurrentPage.AppendTransaction(tx)
+	}
+	return nil
+}
+
 func (o *Oracle) Run(port int) error {
 
 	if err := o.swift.Start(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err.Error())
 	}
 
-	if err := o.Bootstrap(); err != nil {
+	err := o.Bootstrap() 
+
+	if err != nil {
 		log.Fatalf("Failed to bootstrap: %v", err.Error())
 	}
 

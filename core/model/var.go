@@ -1,5 +1,9 @@
 package model
 
+import (
+	"log"
+)
+
 type VarType int
 
 type VarValue interface {
@@ -22,3 +26,15 @@ const (
 func (v *Var) GetValue() interface{} {
 	return v.Value
 }
+
+func (v *Var) Vec() *StateVector {
+	if v.Type != VarTypeVector {
+		log.Fatalf("call Vec() on var with %d", v.Type)
+	}
+	sv, ok := (v.Value).(*StateVector)
+	if !ok {
+		log.Fatalf("var.Value conversion to state vector failed")
+	}
+	return sv
+}
+

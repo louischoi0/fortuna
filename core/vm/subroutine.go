@@ -52,4 +52,3 @@ func NewLogMachineStateSubroutine(machineID string, stateVector *model.StateVect
 
 	return subroutine
 }
-
