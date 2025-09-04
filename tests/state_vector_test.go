@@ -17,3 +17,15 @@ func TestStateVector(t *testing.T) {
 	fmt.Println(vector)
 	fmt.Println(decoded)
 }
+
+func TestStateVector2(t *testing.T) {
+	vector := model.NewStateVector(make([]int64, 8, 8))
+	encoded := vector.Encode()
+	decoded, err := model.DecodeStateVector(encoded)
+	if err != nil {
+		t.Fatalf("failed to decode state vector: %v", err)
+	}
+
+	fmt.Println(vector)
+	fmt.Println(decoded)
+}

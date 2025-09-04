@@ -61,7 +61,6 @@ func (tx *RawTransaction) Verify(hash string) error {
 
 func (tx *RawTransaction) Hash() string {
 	var buf strings.Builder
-
 	tx.UpdateRawCode()
 
 	buf.WriteString(strconv.Itoa(int(tx.Timestamp)))
@@ -99,6 +98,7 @@ func (rtx *RawTransaction) Encode() ([]byte, error) {
 	if len(hash) != C.MODEL_HASH_STR_LENGTH {
 		return nil, fmt.Errorf("hash must have length %d", C.MODEL_HASH_STR_LENGTH)
 	}
+
 	if len(rtx.SpaceID) != C.SPACE_ID_STR_LENGTH {
 		return nil, fmt.Errorf("spaceID must have length %d", C.SPACE_ID_STR_LENGTH)
 	}
@@ -108,23 +108,16 @@ func (rtx *RawTransaction) Encode() ([]byte, error) {
 	}
 
 	buf.WriteString(hash)
-
 	buf.Write(util.EncodeUint64(uint64(rtx.Timestamp)))
 
 	buf.WriteString(rtx.SpaceID)
 	buf.WriteString(rtx.From)
 
 	buf.WriteByte(1)
-	buf.Write(util.EncodeUint64(uint64(len(rtx.RawCode))))
-	buf.Write(rtx.RawCode)
+	rawCodeBufferSize := uint64(len(rtx.RawCode))
+	buf.Write(util.EncodeUint64(rawCodeBufferSize))
 
-	opcode, err := SerializeCompactOperations(rtx.Operations)
-	if err != nil {
-		return nil, fmt.Errorf("serialize operations: %w", err)
-	}
-	buf.WriteByte(1)
-	buf.Write(util.EncodeUint64(uint64(len(opcode))))
-	buf.Write([]byte(opcode))
+	buf.Write(rtx.RawCode)
 
 	return buf.Bytes(), nil
 }
@@ -142,7 +135,6 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return nil
 	}
 	readFixedString := func(k int) (string, error) {
-		fmt.Printf("read fixed string %d, offset:%d\n", k, off)
 		if err := need(k); err != nil {
 			return "", err
 		}
@@ -182,7 +174,6 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return nil, fmt.Errorf("read from: %w", err)
 	}
 
-	fmt.Println("from: ", from)
 
 	if err := need(1); err != nil {
 		return nil, fmt.Errorf("read raw_code flag: %w", err)
@@ -203,25 +194,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 	rawCode := b[off : off+int(rawCodeLen)]
 	off += int(rawCodeLen)
 
-	if err := need(1); err != nil {
-		return nil, fmt.Errorf("read ops flag: %w", err)
-	}
-	opFlag := b[off]
-	off++
-	if opFlag != 1 {
-		return nil, fmt.Errorf("unexpected ops flag: %d", opFlag)
-	}
-	opLen, err := readU64LE()
-	if err != nil {
-		return nil, fmt.Errorf("read ops length: %w", err)
-	}
-	if err := need(int(opLen)); err != nil {
-		return nil, fmt.Errorf("read ops body: %w", err)
-	}
-	opCode := b[off : off+int(opLen)]
-	off += int(opLen)
-
-	ops, err := ParseCompactOperations(opCode)
+	ops, err := ParseCompactOperations(rawCode)
 	if err != nil {
 		return nil, fmt.Errorf("parse ops: %w", err)
 	}

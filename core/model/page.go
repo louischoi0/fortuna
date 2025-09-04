@@ -103,6 +103,7 @@ func (page *Page) UpdateTransactionRoot() {
 	for i, er := range page.Transactions {
 		contents[i] = er
 	}
+
 	mt, err := structure.NewTree(contents)
 	if err != nil {
 		panic(err)
@@ -330,6 +331,7 @@ func DecodePage(b []byte) (*Page, error) {
 		txs = append(txs, tx)
 	}
 
+	fmt.Println("make page")
 	page := &Page{
 		SpaceID:	     spaceID,
 		N:                   pageNum,
@@ -341,9 +343,12 @@ func DecodePage(b []byte) (*Page, error) {
 		Transactions:        txs,
 	}
 
+	fmt.Println("update root")
 	page.UpdateExecutionRoot()
+	fmt.Println("update root")
 	page.UpdateTransactionRoot()
 
+	fmt.Println("return page")
 	return page, nil
 }
 

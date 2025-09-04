@@ -42,6 +42,26 @@ func TestTransaction(t *testing.T) {
 		//log.Println(va)
 		vv, _ := va.(*model.Var)
 		log.Printf("%T", vv.Vec())
+		log.Println(vv.Vec().Data)
+
+		log.Println(transaction.RawCode)
+		log.Println(decoded.RawCode)
+
+		if transaction.SpaceID != decoded.SpaceID {
+			t.Fatalf("space iD does not matched %s, %s", transaction.SpaceID, decoded.SpaceID)
+		}
+
+		if transaction.From != decoded.From {
+			t.Fatalf("from does not matched %s, %s", transaction.From, decoded.From)
+		}
+
+		if transaction.Timestamp != decoded.Timestamp {
+			t.Fatalf("timestamp does not matched %d, %d", transaction.Timestamp, decoded.Timestamp)
+		}
+
+		if transaction.Hash() != decoded.Hash() {
+			t.Fatalf("hash does not matched %s, %s", transaction.Hash(), decoded.Hash())
+		}
 	})
 }
 

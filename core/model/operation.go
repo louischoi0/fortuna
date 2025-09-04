@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"strconv"
 )
 
@@ -59,7 +60,7 @@ func serializeVar(sb *bytes.Buffer, arg interface{}) error {
 			return fmt.Errorf("nested operation serialize failed: %v", err)
 		}
 	default:
-		return fmt.Errorf("unsupported argument type: %T", v)
+		log.Fatalf("unsupported argument type: %T", v)
 	}
 	return nil
 }

@@ -52,6 +52,7 @@ func DecodeStateVector(b []byte) (*StateVector, error) {
 		return nil, fmt.Errorf("invalid state vector: missing length (uint64)")
 	}
 	size, err := util.DecodeUint64(b[i : i+8])
+
 	if err != nil {
 		return nil, fmt.Errorf("invalid state vector: missing length (uint64)")
 	}

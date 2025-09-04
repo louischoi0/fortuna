@@ -27,10 +27,12 @@ func asbyte(b []byte) byte {
 	return b[0]
 }
 
+/**
 func ParseCompactOperation(input []byte) (*Operation, error) {
 	r := &reader{src: input, pos: 0}
 	return parseOperation(r)
 }
+**/
 
 type reader struct {
 	src []byte
@@ -48,7 +50,15 @@ func (r *reader) readU64LE() (uint64, error) {
 	off := r.pos
 	v, err := util.DecodeUint64(r.src[off : off+8])
 	if err != nil {
-		log.Fatalf("%s", err.Error())
+		return 0, err
+	}
+	return v, nil
+}
+
+func (r *reader) takeU64LE() (uint64, error) {
+	v, err := r.readU64LE()
+	if err != nil {
+		return 0, err
 	}
 	r.pos += 8
 	return v, nil
@@ -56,6 +66,7 @@ func (r *reader) readU64LE() (uint64, error) {
 
 func (r *reader) take(n int) []byte {
 	if r.pos+n > len(r.src) {
+		log.Fatalf("r.pos+n bigger than src")
 		return nil
 	}
 
@@ -72,9 +83,11 @@ func (r *reader) next() byte {
 
 func (r *reader) readWhile(pred func(byte) bool) []byte {
 	start := r.pos
+	fmt.Println("read while start")
 	for r.pos < len(r.src) && pred(r.src[r.pos]) {
 		r.pos++
 	}
+	fmt.Println("read while done")
 	return r.src[start:r.pos]
 }
 
@@ -88,22 +101,23 @@ func parseOperation(r *reader) (*Operation, error) {
 	}
 
 	code := r.readWhile(func(c byte) bool { return c >= '0' && c <= '9' })
-	code_buf := make([]byte, 0, 100)
-	code_buf = append(code_buf, CODE_MARK...)
-	code_buf = append(code_buf, code...)
 
 	op := &Operation{
-		OpCode: string(code_buf),
+		OpCode: "x" + string(code),
 		Args:   []interface{}{},
 	}
 
 	for {
+		fmt.Println("oh no!")
 		ch := r.peek()
+
+		log.Printf("ch: %v, pos: %d, len: %d, src: %s, ssrc: %s", string(ch), r.pos, len(r.src), r.src, r.src[r.pos:len(r.src)-1])
+
 		switch ch {
 		case 0:
 			return nil, errors.New("unterminated operation: missing ';'")
 		case asbyte(OP_END_SYMBOL):
-			r.next() // consume ';'
+			r.next()
 			return op, nil
 		default:
 			// expect an argument
@@ -114,16 +128,23 @@ func parseOperation(r *reader) (*Operation, error) {
 			switch r.peek() {
 			case asbyte(STR_SYMBOL):
 				// $"..."`
+				log.Println("sn0")
 				if r.next() != asbyte(STR_SYMBOL) {
 					return nil, errors.New(`expected '"' to start string`)
 				}
+
+				log.Println("sn1")
 				str := r.readWhile(func(c byte) bool {
 					return c != asbyte(STR_END_SYMBOL)
 				})
+
+				log.Println("sn2")
 				if r.next() != asbyte(STR_END_SYMBOL) {
 					return nil, errors.New(`unterminated string: missing '"'`)
 				}
-				op.Args = append(op.Args, str)
+
+				log.Println("sn3")
+				op.Args = append(op.Args, string(str))
 
 			case asbyte(INT_SYMBOL):
 				// $!123!
@@ -164,9 +185,12 @@ func parseOperation(r *reader) (*Operation, error) {
 					return nil, fmt.Errorf("failed to parse vector: %w", err)
 				}
 
-				buf := r.take(int(vec_buf_size))
+				buf := r.take(int(vec_buf_size)+8)
 
-				log.Println("vector buf string: ", string(buf))
+				if buf == nil {
+					log.Fatalf("empty buffer while parsing vector")
+				}
+
 				vec, err := DecodeStateVector([]byte(buf))
 
 				if err != nil {
