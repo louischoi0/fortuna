@@ -4,6 +4,7 @@ import (
 	"fortuna/core/model"
 	"fortuna/util"
 	"time"
+	"log"
 )
 
 type ResetStateSignal struct {
@@ -43,8 +44,13 @@ func NewBasicStateMachine(space *model.Space, stateCount int64) *StateMachine {
 }
 
 func (machine *StateMachine) EmitEventResult(event *model.Event) (*model.EventResult, error) {
-	er := EXEC_INTERFACE(machine, event, machine.StateKernel)
+	er := EXEC_INTERFACE(machine.State, event, machine.StateKernel)
 	return er, nil
+}
+
+func VerifyEventResult(state *model.StateVector, kernel StateKernel, res *model.EventResult) bool {
+	er := EXEC_INTERFACE(state, res.Event, kernel)
+	return er.Hash() == res.Hash()
 }
 
 func (machine *StateMachine) ExecuteEvent(state *model.StateVector, tx interface{}) (interface{}, error) {
@@ -75,12 +81,50 @@ func (machine *StateMachine) NewLogMachineStateTransaction() *model.Transaction 
 	subroutine := NewLogMachineStateSubroutine(machine.ID, machine.State)
 
 	return &model.Transaction{
+		Type: "log_machine_state",
 		SpaceID: machine.SpaceID,
 		From:    machine.ID,
 		// Params:  params,
 		Operations: subroutine.Operations,
 		Timestamp: util.Now(),
 	}
+}
+
+func GetMachineStateFromTransaction(tx *model.Transaction) (string, string, *model.StateVector) {
+	// machine state should be written to the universe when transaction executed,
+	// and retrv machine state for the period have to look up universe db (rocksdb)
+	// but now we just extract state from transaction not via universe yet
+	if tx.Type != "log_machine_state" {
+		log.Fatalf("transaction expected to have log_machine_state type, not %s", tx.Type)
+	}
+	
+	if len(tx.Operations) != 1 {
+		log.Fatalf("state log transaction should have one operation. not %d", len(tx.Operations))
+	}
+
+	if len(tx.Operations[0].Args) != 3 {
+		log.Fatalf("state log transaction should have 2 args. not %d", len(tx.Operations[0].Args))
+	}
+	
+	spaceID := tx.Operations[0].Args[0]
+	spaceID, ok := spaceID.(string)
+	if !ok {
+		log.Fatalf("state log transaction shuld have spaceID for first parameter")
+	}
+	
+	machineID := tx.Operations[0].Args[0]
+
+	if !ok {
+		log.Fatalf("state log transaction shuld have machineID for second parameter")
+	}
+
+	v := tx.Operations[0].Args[2]
+	sv, ok := v.(*model.StateVector)
+	if !ok {
+		log.Fatalf("state log transaction shuld have state vector for third parameter")
+	}
+
+	return spaceID, machineID, sv
 }
 
 func MakeStateMachineID(spaceID string) string {

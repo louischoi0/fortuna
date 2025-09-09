@@ -3,6 +3,9 @@ package service
 import (
 	"fmt"
 	"fortuna/core/model"
+	"fortuna/core/vm"
+	"fortuna/structure"
+
 	"fortuna/rock"
 	"fortuna/util"
 	"log"
@@ -10,6 +13,41 @@ import (
 
 	"github.com/linxGnu/grocksdb"
 )
+
+
+type MachineStateSnapshot struct {
+	MachineID   	string
+	SpaceID     	string
+	ActivatedAt 	int64
+	Duration    	int64
+	State	    	*model.StateVector
+}
+
+type MachineStateHistory struct {
+	MachineID	string
+	SpaceID		string
+	history		*structure.SortedList[int64, *MachineStateSnapshot]
+}
+
+func NewMachineStateHistory(spaceID, machineID string) *MachineStateHistory {
+	return &MachineStateHistory{
+		SpaceID: spaceID,
+		MachineID: machineID,
+		history: structure.NewSortedList[int64, *MachineStateSnapshot](),
+	}
+}
+
+func (ts *MachineStateHistory) AddMachineStateLogTransaction(spaceID string, machineID string, tx *model.Transaction) {
+	state := vm.GetMachineStateFromTransaction(tx)
+	sn := &MachineStateSnapshot{
+		MachineID: machineID,
+		SpaceID: tx.SpaceID,
+		State: state,
+		ActivatedAt: tx.Timestamp,
+	}
+
+	ts.history.Set(tx.Timestamp, sn)
+}
 
 type EventIndex struct {
 	EventID string
@@ -25,15 +63,35 @@ type SpaceIndexer struct {
 	dbs       	map[string]*grocksdb.DB
 	indexerDB 	*grocksdb.DB
 
-	eventIndicies 	map[string]map[string]*EventIndex
-	events        	map[string]map[string]*model.EventResult
+	eventIndicies 			map[string]map[string]*EventIndex
+	events        		map[string]map[string]*model.EventResult
 
 	// EventID <-> SpaceID
 	eventSpaceIDMappingCache	map[string]string
-	eventCache		map[string]*model.EventResult
+	eventCache			map[string]*model.EventResult
 
-	eventCounts	map[string]int64
+	eventCounts			map[string]int64
 	//TODO snapshots
+
+	// SpaceID -> machineID -> ts
+	stateHistory map[string]map[string]*MachineStateHistory
+}
+
+func (si *SpaceIndexer) GetMachineStateHistory(spaceID string, machineID string) *MachineStateHistory {
+	machines, ok := si.stateHistory[spaceID]
+	if !ok {
+		machines = make(map[string]*MachineStateHistory)
+		si.stateHistory[spaceID] = machines
+	}
+
+	history, ok := machines[machineID]
+	if !ok {
+		history = NewMachineStateHistory(spaceID, machineID)
+		machines[machineID] = history
+	}
+
+	return history
+
 }
 
 func (si *SpaceIndexer) GetExecutionInfo(eventID string) (*model.EventResult, error) {
@@ -42,13 +100,6 @@ func (si *SpaceIndexer) GetExecutionInfo(eventID string) (*model.EventResult, er
 		return nil, fmt.Errorf("event %s not found", eventID)
 	}
 	return ex, nil
-}
-
-type MachineStateSnapshot struct {
-	MachineID   string
-	SpaceID     string
-	ActivatedAt int64
-	Duration    int64
 }
 
 func NewSpaceIndexer(universe map[string]*model.Space, dbs map[string]*grocksdb.DB) *SpaceIndexer {
@@ -67,17 +118,6 @@ func NewSpaceIndexer(universe map[string]*model.Space, dbs map[string]*grocksdb.
 		eventSpaceIDMappingCache: make(map[string]string),
 		eventCache: make(map[string]*model.EventResult),
 	}
-}
-
-func (si *SpaceIndexer) SelectMachineStateSnapshot(machineID string, spaceID string, activatedAt int64, duration int64) (*MachineStateSnapshot, error) {
-	snapshot := &MachineStateSnapshot{
-		MachineID:   machineID,
-		SpaceID:     spaceID,
-		ActivatedAt: activatedAt,
-		Duration:    duration,
-	}
-
-	return snapshot, nil
 }
 
 func (si *SpaceIndexer) ReadEvent(eventID string) (*model.EventResult, error) {
@@ -189,6 +229,31 @@ func (si *SpaceIndexer) ScanPage(page *model.Page) error {
 
 	for _, execution := range page.Executions {
 		si.AddExecution(pageNum, execution)
+	}
+
+	/**
+	for _, transaction := range page.Transactions {
+		si.AddTransaction(
+	}
+	**/
+
+	return nil
+}
+
+func (si *SpaceIndexer) IndexMachineStateLogTransaction(tx *model.Transaction) error {
+	machineID := tx.From
+	history := si.GetMachineStateHistory(tx.SpaceID, machineID)
+	history.AddMachineStateLogTransaction(tx.SpaceID, machineID, tx)
+
+	return nil
+}
+
+func (si *SpaceIndexer) IndexTransaction(tx *model.Transaction) error {
+	switch tx.Type {
+	case "log_machine_state":
+		return si.IndexMachineStateLogTransaction(tx)
+	default:
+		break
 	}
 
 	return nil

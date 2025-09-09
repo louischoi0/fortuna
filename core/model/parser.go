@@ -83,11 +83,9 @@ func (r *reader) next() byte {
 
 func (r *reader) readWhile(pred func(byte) bool) []byte {
 	start := r.pos
-	fmt.Println("read while start")
 	for r.pos < len(r.src) && pred(r.src[r.pos]) {
 		r.pos++
 	}
-	fmt.Println("read while done")
 	return r.src[start:r.pos]
 }
 
@@ -108,10 +106,9 @@ func parseOperation(r *reader) (*Operation, error) {
 	}
 
 	for {
-		fmt.Println("oh no!")
 		ch := r.peek()
 
-		log.Printf("ch: %v, pos: %d, len: %d, src: %s, ssrc: %s", string(ch), r.pos, len(r.src), r.src, r.src[r.pos:len(r.src)-1])
+		// log.Printf("ch: %v, pos: %d, len: %d, src: %s, ssrc: %s", string(ch), r.pos, len(r.src), r.src, r.src[r.pos:len(r.src)-1])
 
 		switch ch {
 		case 0:
@@ -128,22 +125,18 @@ func parseOperation(r *reader) (*Operation, error) {
 			switch r.peek() {
 			case asbyte(STR_SYMBOL):
 				// $"..."`
-				log.Println("sn0")
 				if r.next() != asbyte(STR_SYMBOL) {
 					return nil, errors.New(`expected '"' to start string`)
 				}
 
-				log.Println("sn1")
 				str := r.readWhile(func(c byte) bool {
 					return c != asbyte(STR_END_SYMBOL)
 				})
 
-				log.Println("sn2")
 				if r.next() != asbyte(STR_END_SYMBOL) {
 					return nil, errors.New(`unterminated string: missing '"'`)
 				}
 
-				log.Println("sn3")
 				op.Args = append(op.Args, string(str))
 
 			case asbyte(INT_SYMBOL):

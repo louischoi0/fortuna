@@ -22,11 +22,11 @@ func (o *ABI) ReadVar(address interface{}) *model.Operation {
 	}
 }
 
-func (o *ABI) WriteMachineState(vector interface{}) *model.Operation {
+func (o *ABI) WriteMachineState(spaceID, machineID, vector interface{}) *model.Operation {
 	return &model.Operation{
 		OpCode: "x2",
 		OpName: "write_machine_state",
-		Args:   []interface{}{vector},
+		Args:   []interface{}{spaceID, machineID, vector},
 	}
 }
 

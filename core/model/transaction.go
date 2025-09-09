@@ -14,6 +14,7 @@ import (
 type Transaction = RawTransaction
 
 type RawTransaction struct {
+	Type	   string	`json:"type"`
 	SpaceID    string       `json:"space_id"`
 	From       string       `json:"from"`
 	Operations []*Operation `json:"operations"`
@@ -29,6 +30,9 @@ func NewRawTransaction(spaceID string, from string) *RawTransaction {
 		Operations: []*Operation{},
 		RawCode:    []byte{},
 	}
+}
+func (tx *RawTransaction) SetType(txType string) {
+	tx.Type = txType
 }
 
 func (tx *RawTransaction) Verify(hash string) error {

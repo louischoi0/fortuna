@@ -37,17 +37,17 @@ func NewErrorEventResultUnknownInterfaceID(event *model.Event) *model.EventResul
 	}
 }
 
-func EXEC_INTERFACE(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventResult {
+func EXEC_INTERFACE(state *model.StateVector, event *model.Event, kernel StateKernel) *model.EventResult {
 	switch InterfaceID(event.Spec.InterfaceID) {
 	case FIC__001:
-		return EVENT__001(machine, event, kernel)
+		return EVENT__001(state, event, kernel)
 	default:
 		return NewErrorEventResultUnknownInterfaceID(event)
 	}
 
 }
 
-func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventResult {
+func EVENT__001(machineState *model.StateVector, event *model.Event, kernel StateKernel) *model.EventResult {
 	seed := event.Hash()
 	slot_count, ok := event.Spec.Params.Int64("slot_count")
 
@@ -55,7 +55,7 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 		return NewErrorEventResultRequiredParameter(event, "slot_count")
 	}
 
-	if int(slot_count) >= machine.State.Size() {
+	if int(slot_count) >= machineState.Size() {
 		return NewErrorEventResultRequiredParameter(event, "slot_count is bigger than legth of machine state")
 	}
 
@@ -64,10 +64,10 @@ func EVENT__001(machine *StateMachine, event *model.Event, kernel StateKernel) *
 	b := indices[1] % uint64(slot_count)
 
 	log.Printf("seed=%v, a=%v, b=%v", seed, a, b)
-	log.Printf("sa=%v, sb=%v", machine.State.Get(int64(a)), machine.State.Get(int64(b)))
+	log.Printf("sa=%v, sb=%v", machineState.Get(int64(a)), machineState.Get(int64(b)))
 
 	var result string
-	if machine.State.Get(int64(a)) > machine.State.Get(int64(b)) {
+	if machineState.Get(int64(a)) > machineState.Get(int64(b)) {
 		result = "t"
 	} else {
 		result = "f"
