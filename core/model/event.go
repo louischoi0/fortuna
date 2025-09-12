@@ -454,10 +454,11 @@ func (er *EventExecutionError) Map() *structure.OrderedMap {
 }
 
 type EventResult struct {
-	Event     	*Event               `json:"event"`
-	H		string               `json:"hash"`
-	Result    	string               `json:"result"`
-	Err       	*EventExecutionError `json:"error"`
+	Event     				*Event               `json:"event"`
+	H					string               `json:"hash"`
+	Result    				string               `json:"result"`
+	RefMachineStateTimestamp		int64		     `json:"ref_machine_state_timestamp"`
+	Err       				*EventExecutionError `json:"error"`
 }
 
 func (xr *EventResult) GetSpaceID() string {

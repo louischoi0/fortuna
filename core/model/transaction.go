@@ -112,6 +112,7 @@ func (rtx *RawTransaction) Encode() ([]byte, error) {
 	}
 
 	buf.WriteString(hash)
+	buf.WriteString(util.PadLeftS(rtx.Type, C.TRANSACTION_TYPE_LENGTH))
 	buf.Write(util.EncodeUint64(uint64(rtx.Timestamp)))
 
 	buf.WriteString(rtx.SpaceID)
@@ -163,6 +164,11 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return nil, fmt.Errorf("read hash: %w", err)
 	}
 
+	txType, err := readFixedString(C.TRANSACTION_TYPE_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read txType: %w", err)
+	}
+
 	ts, err := readU64LE()
 	if err != nil {
 		return nil, fmt.Errorf("read timestamp: %w", err)
@@ -205,6 +211,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 
 	return &RawTransaction{
 		Timestamp:  int64(ts),
+		Type: 	    util.UnpadLeftS(txType),
 		SpaceID:    spaceID,
 		From:       from,
 		RawCode:    rawCode,

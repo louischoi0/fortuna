@@ -12,7 +12,7 @@ import (
 )
 
 var MetastoreRootDir = "data"
-var LOGGING = false
+var LOGGING = true
 
 func MetaStoreDataRootDir() string {
 	return MetastoreRootDir

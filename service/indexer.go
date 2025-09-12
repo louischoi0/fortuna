@@ -30,6 +30,8 @@ type MachineStateHistory struct {
 }
 
 func NewMachineStateHistory(spaceID, machineID string) *MachineStateHistory {
+	log.Printf("create new machine state hist instance for %s", machineID)
+
 	return &MachineStateHistory{
 		SpaceID: spaceID,
 		MachineID: machineID,
@@ -37,11 +39,13 @@ func NewMachineStateHistory(spaceID, machineID string) *MachineStateHistory {
 	}
 }
 
-func (ts *MachineStateHistory) AddMachineStateLogTransaction(spaceID string, machineID string, tx *model.Transaction) {
-	state := vm.GetMachineStateFromTransaction(tx)
+func (ts *MachineStateHistory) AddMachineStateLogTransaction(tx *model.Transaction) {
+	spaceID, machineID, state := vm.GetMachineStateFromTransaction(tx)
+	log.Printf("add machine state log transaction %s", tx.Hash())
+
 	sn := &MachineStateSnapshot{
 		MachineID: machineID,
-		SpaceID: tx.SpaceID,
+		SpaceID: spaceID,
 		State: state,
 		ActivatedAt: tx.Timestamp,
 	}
@@ -103,6 +107,8 @@ func (si *SpaceIndexer) GetExecutionInfo(eventID string) (*model.EventResult, er
 }
 
 func NewSpaceIndexer(universe map[string]*model.Space, dbs map[string]*grocksdb.DB) *SpaceIndexer {
+	log.Printf("create space indexer instance")
+
 	db, err := rock.GetDBInstance("indexer.meta")
 	if err != nil {
 		log.Fatalf("failed to get rocks db: %v", err.Error())
@@ -117,7 +123,21 @@ func NewSpaceIndexer(universe map[string]*model.Space, dbs map[string]*grocksdb.
 		eventCounts:   make(map[string]int64),
 		eventSpaceIDMappingCache: make(map[string]string),
 		eventCache: make(map[string]*model.EventResult),
+		stateHistory: make( map[string]map[string]*MachineStateHistory),
 	}
+}
+
+func (si *SpaceIndexer) FormatKeyStateLogTransaction(tx *model.Transaction) string {
+	spaceID, machineID, _ := vm.GetMachineStateFromTransaction(tx)
+	return fmt.Sprintf("%s:%s:%d", spaceID, machineID, tx.Timestamp)
+}
+
+func (si *SpaceIndexer) WriteIndexerDB(k string, v []byte) error {
+	return rock.SetValue(si.indexerDB, k, v)
+}
+
+func (si *SpaceIndexer) ReadIndexerDB(k string) ([]byte, error) {
+	return rock.GetValue(si.indexerDB, k)
 }
 
 func (si *SpaceIndexer) ReadEvent(eventID string) (*model.EventResult, error) {
@@ -222,7 +242,7 @@ func (si *SpaceIndexer) AddExecution(pageNum uint64, execution *model.EventResul
 }
 
 func (si *SpaceIndexer) ScanPage(page *model.Page) error {
-	log.Printf("indexer scan page %s:%d", page.SpaceID, page.N)
+	log.Printf("indexer scan page %s:%d, tx: %d, ex: %d", page.SpaceID, page.N, len(page.Transactions), len(page.Executions))
 
 	pageNum := page.GetPageNum()
 	defer si.SetLastIndexedPageNum(page.SpaceID, pageNum)
@@ -231,11 +251,12 @@ func (si *SpaceIndexer) ScanPage(page *model.Page) error {
 		si.AddExecution(pageNum, execution)
 	}
 
-	/**
 	for _, transaction := range page.Transactions {
-		si.AddTransaction(
+		err := si.IndexTransaction(transaction)
+		if err != nil {
+			log.Fatalf("%w", err)
+		}
 	}
-	**/
 
 	return nil
 }
@@ -243,12 +264,20 @@ func (si *SpaceIndexer) ScanPage(page *model.Page) error {
 func (si *SpaceIndexer) IndexMachineStateLogTransaction(tx *model.Transaction) error {
 	machineID := tx.From
 	history := si.GetMachineStateHistory(tx.SpaceID, machineID)
-	history.AddMachineStateLogTransaction(tx.SpaceID, machineID, tx)
+	history.AddMachineStateLogTransaction(tx)
 
-	return nil
+	k := si.FormatKeyStateLogTransaction(tx)
+	buffer, err := tx.Encode()
+	if err != nil {
+		return err
+	}
+
+	return si.WriteIndexerDB(k, buffer)
 }
 
 func (si *SpaceIndexer) IndexTransaction(tx *model.Transaction) error {
+	log.Printf("index transaction type: %s,", tx.Type)
+
 	switch tx.Type {
 	case "log_machine_state":
 		return si.IndexMachineStateLogTransaction(tx)

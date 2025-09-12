@@ -37,14 +37,35 @@ func NewErrorEventResultUnknownInterfaceID(event *model.Event) *model.EventResul
 	}
 }
 
-func EXEC_INTERFACE(state *model.StateVector, event *model.Event, kernel StateKernel) *model.EventResult {
+func VERIFY_INTERFACE(state *model.StateVector, ex *model.EventResult, kernel StateKernel) bool  {
+	switch InterfaceID(ex.Event.Spec.InterfaceID) {
+	case FIC__001:
+		res := EVENT__001(state, ex.Event, kernel)
+		return res.Hash() == ex.Hash()
+	default:
+		return false
+	}
+}
+
+func EXEC_INTERFACE(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventResult {
+	var res *model.EventResult
+	defer EXEC_CALLBACK(machine, res)
+
 	switch InterfaceID(event.Spec.InterfaceID) {
 	case FIC__001:
-		return EVENT__001(state, event, kernel)
+		res = EVENT__001(machine.State, event, kernel)
+		return res
 	default:
 		return NewErrorEventResultUnknownInterfaceID(event)
 	}
 
+}
+
+func EXEC_CALLBACK(machine *StateMachine, res *model.EventResult) {
+	if res == nil {
+		return
+	}
+	res.RefMachineStateTimestamp = machine.InitStateTransaction.Timestamp
 }
 
 func EVENT__001(machineState *model.StateVector, event *model.Event, kernel StateKernel) *model.EventResult {

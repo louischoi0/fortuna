@@ -43,11 +43,11 @@ func (sr *Subroutine) AddOperation(op *model.Operation) {
 	sr.Operations = append(sr.Operations, op)
 }
 
-func NewLogMachineStateSubroutine(machineID string, stateVector *model.StateVector) *Subroutine {
+func NewLogMachineStateSubroutine(spaceID string, machineID string, stateVector *model.StateVector) *Subroutine {
 	subroutine := &Subroutine{}
 	abi := &ABI{}
 
-	write_op := abi.WriteVar(machineID, stateVector.Var())
+	write_op := abi.WriteMachineState(spaceID, machineID, stateVector.Var())
 	subroutine.AddOperation(write_op)
 
 	return subroutine

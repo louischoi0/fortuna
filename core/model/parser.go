@@ -194,7 +194,7 @@ func parseOperation(r *reader) (*Operation, error) {
 					return nil, errors.New(`unterminated ved: missing ']'`)
 				}
 
-				op.Args = append(op.Args, vec.Var())
+				op.Args = append(op.Args, vec)
 
 			default:
 				return nil, fmt.Errorf("unexpected character after $: %q", r.peek())

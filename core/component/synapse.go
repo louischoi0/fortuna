@@ -38,7 +38,8 @@ func (n *Synapse) InitMachines() ([]*model.Transaction, error) {
 	machine.ResetState()
 
 	n.machines[vm.BaseV000] = machine
-	tx := machine.NewLogMachineStateTransaction()
+	tx := machine.InitMachineState()
+
 	initMachineTxs = append(initMachineTxs, tx)
 
 	return initMachineTxs, nil
