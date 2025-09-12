@@ -49,7 +49,6 @@ func VERIFY_INTERFACE(state *model.StateVector, ex *model.EventResult, kernel St
 
 func EXEC_INTERFACE(machine *StateMachine, event *model.Event, kernel StateKernel) *model.EventResult {
 	var res *model.EventResult
-	defer EXEC_CALLBACK(machine, res)
 
 	switch InterfaceID(event.Spec.InterfaceID) {
 	case FIC__001:
@@ -59,13 +58,6 @@ func EXEC_INTERFACE(machine *StateMachine, event *model.Event, kernel StateKerne
 		return NewErrorEventResultUnknownInterfaceID(event)
 	}
 
-}
-
-func EXEC_CALLBACK(machine *StateMachine, res *model.EventResult) {
-	if res == nil {
-		return
-	}
-	res.RefMachineStateTimestamp = machine.InitStateTransaction.Timestamp
 }
 
 func EVENT__001(machineState *model.StateVector, event *model.Event, kernel StateKernel) *model.EventResult {

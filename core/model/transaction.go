@@ -18,7 +18,7 @@ type RawTransaction struct {
 	SpaceID    string       `json:"space_id"`
 	From       string       `json:"from"`
 	Operations []*Operation `json:"operations"`
-	Timestamp  int64        `json:"timestamp"`
+	Timestamp  uint64        `json:"timestamp"`
 	RawCode    []byte       `json:"raw_code"`
 }
 
@@ -26,7 +26,7 @@ func NewRawTransaction(spaceID string, from string) *RawTransaction {
 	return &RawTransaction{
 		SpaceID:    spaceID,
 		From:       from,
-		Timestamp:  util.Now(),
+		Timestamp:  uint64(util.Now()),
 		Operations: []*Operation{},
 		RawCode:    []byte{},
 	}
@@ -113,7 +113,7 @@ func (rtx *RawTransaction) Encode() ([]byte, error) {
 
 	buf.WriteString(hash)
 	buf.WriteString(util.PadLeftS(rtx.Type, C.TRANSACTION_TYPE_LENGTH))
-	buf.Write(util.EncodeUint64(uint64(rtx.Timestamp)))
+	buf.Write(util.EncodeUint64(rtx.Timestamp))
 
 	buf.WriteString(rtx.SpaceID)
 	buf.WriteString(rtx.From)
@@ -210,7 +210,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 	}
 
 	return &RawTransaction{
-		Timestamp:  int64(ts),
+		Timestamp:  ts,
 		Type: 	    util.UnpadLeftS(txType),
 		SpaceID:    spaceID,
 		From:       from,

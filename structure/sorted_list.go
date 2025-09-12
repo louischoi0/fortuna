@@ -5,7 +5,7 @@ import (
 )
 
 type SortedListKeyContraints interface {
-	int64 | string
+	int64 | string | uint64
 }
 
 type SortedList[K SortedListKeyContraints, V any] struct {

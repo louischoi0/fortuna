@@ -457,7 +457,8 @@ type EventResult struct {
 	Event     				*Event               `json:"event"`
 	H					string               `json:"hash"`
 	Result    				string               `json:"result"`
-	RefMachineStateTimestamp		int64		     `json:"ref_machine_state_timestamp"`
+	RefMachineStateTimestamp		uint64		     `json:"ref_machine_state_timestamp"`
+	RefMachineID				string		`json:"ref_machine_id"`
 	Err       				*EventExecutionError `json:"error"`
 }
 
@@ -481,6 +482,8 @@ func (xr *EventResult) Hash() string {
 
 	var buffer strings.Builder
 	buffer.WriteString(xr.Event.Hash())
+	buffer.WriteString(C.HASH_SEPERATOR)
+	buffer.WriteString(xr.RefMachineID)
 	buffer.WriteString(C.HASH_SEPERATOR)
 	buffer.WriteString(xr.Result)
 
@@ -506,6 +509,8 @@ func (xr *EventResult) Encode() ([]byte, error) {
 	var buf bytes.Buffer
 
 	buf.WriteString(xr.Hash())
+	buf.Write(util.EncodeUint64(xr.RefMachineStateTimestamp))
+	buf.WriteString(xr.RefMachineID)
 
 	eventBuffer, err := xr.Event.Encode()
 	if err != nil {
@@ -588,6 +593,16 @@ func DecodeEventResult(b []byte) (*EventResult, error) {
 		return nil, fmt.Errorf("read hash: %w", err)
 	}
 
+	stateTimestamp, err := readU64LE()
+	if err != nil {
+		return nil, err
+	}
+	
+	refMachineID, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ref machine id %s", err)
+	}
+
 	// 2. Read event buffer size
 	eventSize, err := readU64LE()
 	if err != nil {
@@ -622,6 +637,8 @@ func DecodeEventResult(b []byte) (*EventResult, error) {
 	exec := &EventResult{
 		Event:     event,
 		Result:    result,
+		RefMachineID: refMachineID,
+		RefMachineStateTimestamp: stateTimestamp,
 		Err:       nil, // not included in current encoding
 	}
 

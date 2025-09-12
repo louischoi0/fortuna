@@ -121,7 +121,7 @@ func (rp *Replica) HandleBroadcastPage(page *model.Page) error {
 	space := rp.GetSpace(page.SpaceID)
 	log.Printf("replica received page hash: %s, num: %d", page.Hash(), page.N)
 
-	if page.GetPageNum() != space.LastCommittedPageNum + 1{
+	if page.GetPageNum() != space.LastCommittedPageNum + 1 {
 		log.Fatalf("page num does not matched expected %v, but %v", space.LastCommittedPageNum + 1, page.GetPageNum())
 	}
 

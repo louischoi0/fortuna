@@ -45,6 +45,8 @@ func NewBasicStateMachine(space *model.Space, stateCount int64) *StateMachine {
 
 func (machine *StateMachine) EmitEventResult(event *model.Event) (*model.EventResult, error) {
 	er := EXEC_INTERFACE(machine, event, machine.StateKernel)
+	machine.OnEmit(er)
+
 	return er, nil
 }
 
@@ -87,7 +89,7 @@ func (machine *StateMachine) NewLogMachineStateTransaction() *model.Transaction 
 		From:    machine.ID,
 		// Params:  params,
 		Operations: subroutine.Operations,
-		Timestamp: util.Now(),
+		Timestamp: uint64(util.Now()),
 	}
 }
 
@@ -138,5 +140,15 @@ func (m *StateMachine) InitMachineState() *model.Transaction {
 	tx := m.NewLogMachineStateTransaction()
 	m.InitStateTransaction = tx
 	return tx
+}
+
+
+func (machine *StateMachine) OnEmit(res *model.EventResult) {
+	if machine.InitStateTransaction == nil {
+		log.Fatalf("machine state was not initilized")
+	}
+
+	res.RefMachineStateTimestamp = machine.InitStateTransaction.Timestamp
+	res.RefMachineID = machine.ID
 }
 

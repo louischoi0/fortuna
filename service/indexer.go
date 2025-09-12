@@ -18,7 +18,7 @@ import (
 type MachineStateSnapshot struct {
 	MachineID   	string
 	SpaceID     	string
-	ActivatedAt 	int64
+	ActivatedAt 	uint64
 	Duration    	int64
 	State	    	*model.StateVector
 }
@@ -26,7 +26,7 @@ type MachineStateSnapshot struct {
 type MachineStateHistory struct {
 	MachineID	string
 	SpaceID		string
-	history		*structure.SortedList[int64, *MachineStateSnapshot]
+	history		*structure.SortedList[uint64, *MachineStateSnapshot]
 }
 
 func NewMachineStateHistory(spaceID, machineID string) *MachineStateHistory {
@@ -35,7 +35,7 @@ func NewMachineStateHistory(spaceID, machineID string) *MachineStateHistory {
 	return &MachineStateHistory{
 		SpaceID: spaceID,
 		MachineID: machineID,
-		history: structure.NewSortedList[int64, *MachineStateSnapshot](),
+		history: structure.NewSortedList[uint64, *MachineStateSnapshot](),
 	}
 }
 
@@ -125,6 +125,28 @@ func NewSpaceIndexer(universe map[string]*model.Space, dbs map[string]*grocksdb.
 		eventCache: make(map[string]*model.EventResult),
 		stateHistory: make( map[string]map[string]*MachineStateHistory),
 	}
+}
+
+type MachineStateLog struct {
+	SpaceID		string
+	MachineID	string
+	Timestamp	int64
+	State		*model.StateVector
+}
+
+func (si *SpaceIndexer) GetMachineStateLog(spaceID string, machineID string, timestamp int64) (*MachineStateLog, error) {
+	k := fmt.Sprintf("sv:%s:%s:%d", spaceID, machineID, timestamp)
+	buf, err := si.ReadIndexerDB(k)
+	if err != nil {
+		return nil, err
+	}
+	
+	sv, err := model.DecodeStateVector(buf)	
+	if err != nil {
+		return nil, err
+	}
+	res := &MachineStateLog{ State: sv, SpaceID: spaceID, MachineID: machineID, Timestamp: timestamp }
+	return res, nil
 }
 
 func (si *SpaceIndexer) FormatKeyStateLogTransaction(tx *model.Transaction) string {
@@ -262,17 +284,24 @@ func (si *SpaceIndexer) ScanPage(page *model.Page) error {
 }
 
 func (si *SpaceIndexer) IndexMachineStateLogTransaction(tx *model.Transaction) error {
-	machineID := tx.From
-	history := si.GetMachineStateHistory(tx.SpaceID, machineID)
+	spaceID, machineID, state := vm.GetMachineStateFromTransaction(tx)
+
+	history := si.GetMachineStateHistory(spaceID, machineID)
 	history.AddMachineStateLogTransaction(tx)
 
 	k := si.FormatKeyStateLogTransaction(tx)
 	buffer, err := tx.Encode()
+
 	if err != nil {
 		return err
 	}
 
-	return si.WriteIndexerDB(k, buffer)
+	err = si.WriteIndexerDB(fmt.Sprintf("tx:%s", k), buffer)
+	if err != nil {
+		return err
+	}
+
+	return si.WriteIndexerDB(fmt.Sprintf("sv:%s", k), state.Encode())
 }
 
 func (si *SpaceIndexer) IndexTransaction(tx *model.Transaction) error {

@@ -57,6 +57,7 @@ func (n *Synapse) LoadMachine(kernel vm.KernelVersion) (*vm.StateMachine, error)
 
 func (n *Synapse) Confirm(request *model.Event) (*model.EventResult, error) {
 	machine, err := n.LoadMachine(vm.KernelVersion(request.Spec.KernelVersion))
+	log.Printf("machine %s loaded", machine.ID)
 
 	if err != nil {
 		return nil, err
