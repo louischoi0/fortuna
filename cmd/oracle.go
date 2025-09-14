@@ -4,6 +4,7 @@ import (
 	"fortuna/rpc"
 	"fortuna/service"
 	"fortuna/swift"
+	"fmt"
 	"log"
 
 	"github.com/spf13/cobra"
@@ -26,6 +27,26 @@ func CreateOracleListSpacesCMD() *cobra.Command {
 			buffer := swift.FormatJSONResponse(response.Payload)
 			log.Println(buffer)
 
+			return nil
+		},
+	}
+
+	cmd.Flags().StringP("endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint")
+	return cmd
+}
+func CreateOracleGetStatusCMD() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "get status",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			endpoint, _ := cmd.Flags().GetString("endpoint")
+			request := rpc.NewRawRequest(endpoint, swift.PacketTypeGetOracleStatusRequest, `""`)
+			response, err := request.Call()
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+			buffer := swift.FormatJSONResponse(response.Payload)
+			fmt.Println(buffer)
 			return nil
 		},
 	}
@@ -100,6 +121,7 @@ func CreateOracleCMD() *cobra.Command {
 	cmd.AddCommand(CreateOracleStartCmd())
 	cmd.AddCommand(CreatePingRequestCMD())
 	cmd.AddCommand(CreateOracleListSpacesCMD())
+	cmd.AddCommand(CreateOracleGetStatusCMD())
 
 	return cmd
 }

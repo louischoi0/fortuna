@@ -27,14 +27,41 @@ var oracle *Oracle
 
 type replicaInfo struct {
 	ID   string `json:"id"`
+	IP   string `json:"ip"`
 	conn net.Conn
 }
 
 func NewReplicaInfo(rid string, conn net.Conn) replicaInfo {
+	ip := "unknown"
+	if addr := conn.RemoteAddr(); addr != nil {
+		if host, _, err := net.SplitHostPort(addr.String()); err == nil {
+			ip = host
+		} else {
+			ip = addr.String()
+		}
+	}
+
 	return replicaInfo{
 		ID:   rid,
+		IP:   ip,
 		conn: conn,
 	}
+}
+
+func (r *replicaInfo) GetConnectionInfo() map[string]string {
+	info := map[string]string{
+		"id": r.ID,
+		"ip": r.IP,
+	}
+
+	if r.conn != nil {
+		if addr := r.conn.RemoteAddr(); addr != nil {
+			info["remote_addr"] = addr.String()
+			info["network"] = addr.Network()
+		}
+	}
+
+	return info
 }
 
 type Oracle struct {
@@ -43,7 +70,7 @@ type Oracle struct {
 	dbs    map[string]*grocksdb.DB
 	metaDB *grocksdb.DB
 
-	Universe      map[string]*model.Space
+	Universe map[string]*model.Space
 
 	eventBuffer       chan *model.EventResult
 	transactionBuffer chan *model.Transaction
@@ -66,9 +93,11 @@ type OracleConfig struct {
 }
 
 type OracleStatus struct {
-	Status  string
-	Version string
-	Replica map[string]replicaInfo `json:"replica"`
+	Status       string
+	Version      string
+	Replica      map[string]replicaInfo `json:"replica"`
+	UniverseInfo *UniverseInfo
+	SpaceCount   int
 }
 
 func (o *Oracle) GetUniverseInfo() *UniverseInfo {
@@ -87,6 +116,8 @@ func (o *Oracle) GetOracleStatus() OracleStatus {
 	res.Replica = o.replicas
 	res.Status = "running"
 	res.Version = "v1.0.0"
+	res.UniverseInfo = o.GetUniverseInfo()
+	res.SpaceCount = len(o.Universe)
 
 	return res
 }
@@ -109,7 +140,7 @@ func (o *Oracle) AllocateSpace(spaceID string, metaDB *grocksdb.DB) ([]*model.Tr
 	o.Universe[spaceID] = space
 
 	syn := component.NewSynapse(space)
-	txs, err := syn.Bootstrap() 
+	txs, err := syn.Bootstrap()
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to bootstrap synapse: %v", err.Error())
@@ -276,7 +307,7 @@ func (o *Oracle) Shutdown() error {
 
 func (o *Oracle) HandleTransactions(txs []*model.Transaction) error {
 
-	for _, tx := range(txs) {
+	for _, tx := range txs {
 		space, err := o.GetSpace(tx.SpaceID)
 
 		if err != nil {
@@ -294,7 +325,7 @@ func (o *Oracle) Run(port int) error {
 		log.Fatalf("Failed to start server: %v", err.Error())
 	}
 
-	err := o.Bootstrap() 
+	err := o.Bootstrap()
 
 	if err != nil {
 		log.Fatalf("Failed to bootstrap: %v", err.Error())

@@ -209,7 +209,7 @@ func (o *Oracle) RegisterHandlers() error {
 
 	o.swift.RegisterHandler(swift.PacketTypeReplicaGetSpacePageNumRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		var req struct {
-			SpaceID string	`json:"space_id"`
+			SpaceID string `json:"space_id"`
 		}
 
 		err := json.Unmarshal(packet.Payload, &req)
@@ -230,11 +230,10 @@ func (o *Oracle) RegisterHandlers() error {
 			return o.swift.SendErrorResponse(ctx, fmt.Sprintf("failed to ser pagenum %s", npage))
 		}
 
-		response := &swift.Packet{ Type: swift.PacketTypeReplicaGetSpacePageNumResponse, Payload: buf }
+		response := &swift.Packet{Type: swift.PacketTypeReplicaGetSpacePageNumResponse, Payload: buf}
 
 		return o.swift.Send(ctx, response)
 	})
-
 
 	o.swift.RegisterHandler(swift.PacketTypeReplicaPageRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
 		var request PReplicaPageRequest
@@ -257,7 +256,7 @@ func (o *Oracle) RegisterHandlers() error {
 		if err != nil {
 			return o.swift.SendErrorResponse(ctx, err.Error())
 		}
-		log.Printf("oracle broad cast page %s, previoushash: %s, num: %d, buffer size: %d", page.Hash(), page.PrevPageHash, page.N,  len(buffer))
+		log.Printf("oracle broad cast page %s, previoushash: %s, num: %d, buffer size: %d", page.Hash(), page.PrevPageHash, page.N, len(buffer))
 
 		response := &swift.Packet{
 			Type:    swift.PacketTypeReplicaPageResponse,

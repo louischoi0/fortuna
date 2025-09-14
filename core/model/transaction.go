@@ -14,11 +14,11 @@ import (
 type Transaction = RawTransaction
 
 type RawTransaction struct {
-	Type	   string	`json:"type"`
+	Type       string       `json:"type"`
 	SpaceID    string       `json:"space_id"`
 	From       string       `json:"from"`
 	Operations []*Operation `json:"operations"`
-	Timestamp  uint64        `json:"timestamp"`
+	Timestamp  uint64       `json:"timestamp"`
 	RawCode    []byte       `json:"raw_code"`
 }
 
@@ -184,7 +184,6 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 		return nil, fmt.Errorf("read from: %w", err)
 	}
 
-
 	if err := need(1); err != nil {
 		return nil, fmt.Errorf("read raw_code flag: %w", err)
 	}
@@ -211,7 +210,7 @@ func DecodeRawTransaction(b []byte) (*RawTransaction, error) {
 
 	return &RawTransaction{
 		Timestamp:  ts,
-		Type: 	    util.UnpadLeftS(txType),
+		Type:       util.UnpadLeftS(txType),
 		SpaceID:    spaceID,
 		From:       from,
 		RawCode:    rawCode,

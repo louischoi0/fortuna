@@ -87,18 +87,19 @@ func NewEventSpecFromOrderedMap(data *structure.OrderedMap) (*EventSpec, error) 
 }
 
 type Event struct {
-	H		string `json:"hash"`
-	Timestamp 	uint64 `json:"timestamp"`
-	Publisher 	string `json:"publisher"`
-	SpaceID   	string `json:"space_id"`
+	H         string `json:"hash"`
+	Timestamp uint64 `json:"timestamp"`
+	Publisher string `json:"publisher"`
+	ServiceID string `json:"service_id"`
+	SpaceID   string `json:"space_id"`
 
-	Payload 	*structure.OrderedMap `json:"payload"`
-	Spec    	*EventSpec            `json:"spec"`
+	Payload *structure.OrderedMap `json:"payload"`
+	Spec    *EventSpec            `json:"spec"`
 
-	Topic     	string `json:"topic"`
-	Subtopic  	string `json:"subtopic"`
-	Seperator 	string `json:"seperator"`
-	Tag       	string `json:"tag"`
+	Topic     string `json:"topic"`
+	Subtopic  string `json:"subtopic"`
+	Seperator string `json:"seperator"`
+	Tag       string `json:"tag"`
 }
 
 // DecodeEvent decodes bytes produced by (*Event).Encode() back into an Event.
@@ -153,6 +154,10 @@ func DecodeEvent(b []byte) (*Event, error) {
 	spaceID, err := readFixedString(C.SPACE_ID_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read spaceID: %w", err)
+	}
+	serviceID, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
+	if err != nil {
+		return nil, fmt.Errorf("read serviceID: %w", err)
 	}
 	ifaceID, err := readFixedString(C.INTERFACE_ID_STR_LENGTH)
 	if err != nil {
@@ -226,6 +231,7 @@ func DecodeEvent(b []byte) (*Event, error) {
 		Timestamp: timestamp,
 		Publisher: publisher,
 		SpaceID:   spaceID,
+		ServiceID: serviceID,
 		Spec: &EventSpec{
 			InterfaceID:   ifaceID,
 			KernelVersion: kernelVer,
@@ -272,6 +278,7 @@ func (event *Event) Encode() ([]byte, error) {
 	buf.WriteString(hash)
 	buf.Write(util.EncodeUint64(event.Timestamp))
 	buf.WriteString(event.Publisher)
+	buf.WriteString(event.ServiceID)
 	buf.WriteString(event.SpaceID)
 	buf.WriteString(event.Spec.InterfaceID)
 	buf.WriteString(event.Spec.KernelVersion)
@@ -305,6 +312,8 @@ func (event *Event) Hash() string {
 	var buf strings.Builder
 
 	buf.WriteString(strconv.Itoa(int(event.Timestamp)))
+	buf.WriteString(C.HASH_SEPERATOR)
+	buf.WriteString(event.ServiceID)
 	buf.WriteString(C.HASH_SEPERATOR)
 	buf.WriteString(event.SpaceID)
 	buf.WriteString(C.HASH_SEPERATOR)
@@ -454,12 +463,12 @@ func (er *EventExecutionError) Map() *structure.OrderedMap {
 }
 
 type EventResult struct {
-	Event     				*Event               `json:"event"`
-	H					string               `json:"hash"`
-	Result    				string               `json:"result"`
-	RefMachineStateTimestamp		uint64		     `json:"ref_machine_state_timestamp"`
-	RefMachineID				string		`json:"ref_machine_id"`
-	Err       				*EventExecutionError `json:"error"`
+	Event                    *Event               `json:"event"`
+	H                        string               `json:"hash"`
+	Result                   string               `json:"result"`
+	RefMachineStateTimestamp uint64               `json:"ref_machine_state_timestamp"`
+	RefMachineID             string               `json:"ref_machine_id"`
+	Err                      *EventExecutionError `json:"error"`
 }
 
 func (xr *EventResult) GetSpaceID() string {
@@ -494,10 +503,10 @@ func NewEventResultFromEvent(event *Event, result string) *EventResult {
 	event.H = event.Hash()
 
 	return &EventResult{
-		Event:     event,
-		Result:    result,
-		H: event.Hash(),
-		Err:       nil,
+		Event:  event,
+		Result: result,
+		H:      event.Hash(),
+		Err:    nil,
 	}
 }
 
@@ -597,7 +606,7 @@ func DecodeEventResult(b []byte) (*EventResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	refMachineID, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ref machine id %s", err)
@@ -635,11 +644,11 @@ func DecodeEventResult(b []byte) (*EventResult, error) {
 	event.H = event.Hash()
 
 	exec := &EventResult{
-		Event:     event,
-		Result:    result,
-		RefMachineID: refMachineID,
+		Event:                    event,
+		Result:                   result,
+		RefMachineID:             refMachineID,
 		RefMachineStateTimestamp: stateTimestamp,
-		Err:       nil, // not included in current encoding
+		Err:                      nil, // not included in current encoding
 	}
 
 	if hash != exec.Hash() {

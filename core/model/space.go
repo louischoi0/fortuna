@@ -125,9 +125,9 @@ type Space struct {
 	SpaceID     string
 	CurrentPage *Page
 
-	LastPage             	*Page
-	LastCommittedPageNum 	uint64
-	ActivePageNum		uint64
+	LastPage             *Page
+	LastCommittedPageNum uint64
+	ActivePageNum        uint64
 
 	Pages       []*Page
 	Storage     *storage.FileStorage
@@ -170,14 +170,14 @@ func NewSpace(spaceID string, metaDB *grocksdb.DB) *Space {
 	page := NewPage(spaceID, 1, nil)
 
 	space = &Space{
-		CurrentPage: page,
-		LastPage:    nil,
-		SpaceID:     spaceID,
-		meta:        metaDB,
-		Storage:     storage,
-		IsReplica:   false,
+		CurrentPage:          page,
+		LastPage:             nil,
+		SpaceID:              spaceID,
+		meta:                 metaDB,
+		Storage:              storage,
+		IsReplica:            false,
 		LastCommittedPageNum: 0,
-		ActivePageNum: 1,
+		ActivePageNum:        1,
 	}
 
 	log.Printf("initailized space %s, pagenum: %v", spaceID, space.LastCommittedPageNum)
@@ -457,13 +457,8 @@ type SpaceInfo struct {
 	LastCommittedPageNum int64  `json:"last_committed_page_num"`
 }
 
-func (s *Space) Hash() string {
-	return "thisishash"
-}
-
 func (s *Space) Info() SpaceInfo {
 	return SpaceInfo{
-		Hash:                 s.Hash(),
 		ActivePageNum:        int64(s.ActivePageNum),
 		LastCommittedPageNum: int64(s.LastCommittedPageNum),
 	}
