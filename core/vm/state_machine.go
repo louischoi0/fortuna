@@ -115,7 +115,7 @@ func GetMachineStateFromTransaction(tx *model.Transaction) (string, string, *mod
 		log.Fatalf("state log transaction shuld have spaceID for first parameter")
 	}
 	
-	machineID := tx.Operations[0].Args[0]
+	machineID := tx.Operations[0].Args[1]
 	machineID, ok = machineID.(string)
 
 	if !ok {

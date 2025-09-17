@@ -52,6 +52,9 @@ const (
 
 	PacketTypeListEventsRequest  PacketType = 0x3d
 	PacketTypeListEventsResponse PacketType = 0x3e
+
+	PacketTypeVerifyEventResultRequest  PacketType = 0x40
+	PacketTypeVerifyEventResultResponse PacketType = 0x41
 )
 
 type Packet struct {

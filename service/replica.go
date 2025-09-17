@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"fortuna/core/model"
+	"fortuna/core/vm"
 	"fortuna/rock"
 	"fortuna/rpc"
 	"fortuna/swift"
@@ -425,6 +426,43 @@ func (rp *Replica) RegisterPacketHandler() {
 		// info := rp.indexer.GetExecutionInfo(eventID)
 
 		return nil
+	})
+
+	rp.swift.RegisterHandler(swift.PacketTypeVerifyEventResultRequest, func(ctx context.Context, conn net.Conn, packet *swift.Packet) error {
+		var req struct {
+			SpaceID		string 	`json:"space_id"`
+			EventHash	string  `json:"event_hash"`	
+		}
+
+		err := json.Unmarshal(packet.Payload, &req)
+		if err != nil {
+			return rp.swift.SendErrorResponse(ctx, err.Error())
+		}
+	
+		event_result, err := rp.indexer.GetExecutionInfo(req.EventHash)
+
+		if err != nil {
+			return rp.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		st, err := rp.indexer.GetMachineStateLog(req.SpaceID, event_result.RefMachineID, event_result.RefMachineStateTimestamp)
+		if err != nil {
+			return rp.swift.SendErrorResponse(ctx, err.Error())
+		}
+
+		version := vm.KernelVersion(event_result.Event.Spec.KernelVersion)
+		kernel := vm.LoadKernel(version)
+
+		
+		res := vm.VerifyEventResult(st.State, kernel, event_result)
+
+		buf, _ := json.Marshal(res)
+
+		response := &swift.Packet{
+			Type:    swift.PacketTypeVerifyEventResultRequest,
+			Payload: buf,
+		}
+		return rp.swift.Send(ctx, response)
 	})
 }
 

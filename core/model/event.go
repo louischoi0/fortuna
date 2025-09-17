@@ -9,6 +9,7 @@ import (
 	"fortuna/util"
 	"strconv"
 	"strings"
+	"log"
 )
 
 type Identity struct {
@@ -153,12 +154,21 @@ func DecodeEvent(b []byte) (*Event, error) {
 
 	spaceID, err := readFixedString(C.SPACE_ID_STR_LENGTH)
 	if err != nil {
-		return nil, fmt.Errorf("read spaceID: %w", err)
+		return nil, err
 	}
-	serviceID, err := readFixedString(C.MODEL_HASH_STR_LENGTH)
+
+	// serviceIDLen, err := readU64LE()
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	/**
+	serviceID, err := readFixedString(int(serviceIDLen))
 	if err != nil {
-		return nil, fmt.Errorf("read serviceID: %w", err)
+		return nil, err
 	}
+	**/
+
 	ifaceID, err := readFixedString(C.INTERFACE_ID_STR_LENGTH)
 	if err != nil {
 		return nil, fmt.Errorf("read interfaceID: %w", err)
@@ -231,7 +241,7 @@ func DecodeEvent(b []byte) (*Event, error) {
 		Timestamp: timestamp,
 		Publisher: publisher,
 		SpaceID:   spaceID,
-		ServiceID: serviceID,
+		//ServiceID: serviceID,
 		Spec: &EventSpec{
 			InterfaceID:   ifaceID,
 			KernelVersion: kernelVer,
@@ -278,7 +288,11 @@ func (event *Event) Encode() ([]byte, error) {
 	buf.WriteString(hash)
 	buf.Write(util.EncodeUint64(event.Timestamp))
 	buf.WriteString(event.Publisher)
-	buf.WriteString(event.ServiceID)
+
+	// serviceIDLen := util.EncodeUint64(uint64(len(event.ServiceID)))
+	// buf.Write(serviceIDLen)
+	// buf.WriteString(event.ServiceID)
+
 	buf.WriteString(event.SpaceID)
 	buf.WriteString(event.Spec.InterfaceID)
 	buf.WriteString(event.Spec.KernelVersion)
@@ -469,6 +483,36 @@ type EventResult struct {
 	RefMachineStateTimestamp uint64               `json:"ref_machine_state_timestamp"`
 	RefMachineID             string               `json:"ref_machine_id"`
 	Err                      *EventExecutionError `json:"error"`
+}
+
+func (xr *EventResult) Equal(lhs *EventResult) bool {
+
+	if xr.Result != lhs.Result {
+		log.Printf("result mismatch %s, %s", xr.Result, lhs.Result)
+		return false
+	}
+
+	if xr.Event.Hash() != lhs.Event.Hash() {
+		log.Printf("event hash mismatch %s, %s", xr.Event.Hash(), lhs.Event.Hash())
+		return false
+	}
+
+	if xr.RefMachineID != lhs.RefMachineID {
+		log.Printf("ref machine id mismatch %s, %s", xr.RefMachineID, lhs.RefMachineID)
+		return false
+	}
+
+	if xr.RefMachineStateTimestamp != lhs.RefMachineStateTimestamp {
+		log.Printf("ref machine state timestamp mismatch %s, %s", xr.RefMachineStateTimestamp, lhs.RefMachineStateTimestamp)
+		return false
+	}
+
+	if xr.Hash() != lhs.Hash() {
+		log.Printf("event result hash mismatch %s, %s", xr.Hash(), lhs.Hash())
+		return false
+	}
+	
+	return true
 }
 
 func (xr *EventResult) GetSpaceID() string {

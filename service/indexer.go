@@ -123,24 +123,28 @@ func NewSpaceIndexer(universe map[string]*model.Space, dbs map[string]*grocksdb.
 		eventCounts:   make(map[string]int64),
 		eventSpaceIDMappingCache: make(map[string]string),
 		eventCache: make(map[string]*model.EventResult),
-		stateHistory: make( map[string]map[string]*MachineStateHistory),
+		stateHistory: make(map[string]map[string]*MachineStateHistory),
 	}
 }
 
 type MachineStateLog struct {
 	SpaceID		string
 	MachineID	string
-	Timestamp	int64
+	Timestamp	uint64
 	State		*model.StateVector
 }
 
-func (si *SpaceIndexer) GetMachineStateLog(spaceID string, machineID string, timestamp int64) (*MachineStateLog, error) {
-	k := fmt.Sprintf("sv:%s:%s:%d", spaceID, machineID, timestamp)
+func FormatStateLogTransactionKey(spaceID, machineID string, timestamp uint64) string {
+	return fmt.Sprintf("sv:%s:%s:%d", spaceID, machineID, timestamp)
+}
+
+func (si *SpaceIndexer) GetMachineStateLog(spaceID string, machineID string, timestamp uint64) (*MachineStateLog, error) {
+	k := FormatStateLogTransactionKey(spaceID, machineID, timestamp)
 	buf, err := si.ReadIndexerDB(k)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	sv, err := model.DecodeStateVector(buf)	
 	if err != nil {
 		return nil, err
@@ -151,7 +155,7 @@ func (si *SpaceIndexer) GetMachineStateLog(spaceID string, machineID string, tim
 
 func (si *SpaceIndexer) FormatKeyStateLogTransaction(tx *model.Transaction) string {
 	spaceID, machineID, _ := vm.GetMachineStateFromTransaction(tx)
-	return fmt.Sprintf("%s:%s:%d", spaceID, machineID, tx.Timestamp)
+	return fmt.Sprintf("tx:%s:%s:%d", spaceID, machineID, tx.Timestamp)
 }
 
 func (si *SpaceIndexer) WriteIndexerDB(k string, v []byte) error {
@@ -296,12 +300,13 @@ func (si *SpaceIndexer) IndexMachineStateLogTransaction(tx *model.Transaction) e
 		return err
 	}
 
-	err = si.WriteIndexerDB(fmt.Sprintf("tx:%s", k), buffer)
+	err = si.WriteIndexerDB(k, buffer)
 	if err != nil {
 		return err
 	}
 
-	return si.WriteIndexerDB(fmt.Sprintf("sv:%s", k), state.Encode())
+	sk := FormatStateLogTransactionKey(spaceID, machineID, tx.Timestamp)
+	return si.WriteIndexerDB(sk, state.Encode())
 }
 
 func (si *SpaceIndexer) IndexTransaction(tx *model.Transaction) error {

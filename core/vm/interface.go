@@ -41,7 +41,10 @@ func VERIFY_INTERFACE(state *model.StateVector, ex *model.EventResult, kernel St
 	switch InterfaceID(ex.Event.Spec.InterfaceID) {
 	case FIC__001:
 		res := EVENT__001(state, ex.Event, kernel)
-		return res.Hash() == ex.Hash()
+		res.RefMachineID = ex.RefMachineID
+		res.RefMachineStateTimestamp = ex.RefMachineStateTimestamp
+
+		return ex.Equal(res)
 	default:
 		return false
 	}

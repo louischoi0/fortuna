@@ -7,56 +7,9 @@ import (
 	"fortuna/rpc"
 	"fortuna/structure"
 	"fortuna/swift"
-	"fortuna/util"
 
 	"github.com/spf13/cobra"
 )
-
-func CreateGenVectorAPI() *cobra.Command {
-	var kernel_version string
-	var endpoint string
-	var size int64
-	var seed string
-
-	cmd := &cobra.Command{
-		Use:   "genvector",
-		Short: "generate vector",
-		Args:  cobra.NoArgs,
-
-		Run: func(cmd *cobra.Command, args []string) {
-
-			omap := structure.NewOrderedMap()
-			omap.Set("kernel_version", kernel_version)
-			omap.Set("size", size)
-			omap.Set("seed", seed)
-
-			payload := omap.Ser()
-
-			request := rpc.CreateRequest(swift.PacketTypeGenVectorRequest, endpoint, payload)
-			response, err := request.Call()
-
-			if err != nil {
-				fmt.Println("error: ", err.Error())
-			}
-
-			if err == nil {
-				var buf []byte
-
-				json.Unmarshal(response.Payload, &buf)
-				fmt.Println(string(response.Payload))
-				fmt.Println(buf)
-				fmt.Println(util.DecodeInt64Array(buf))
-			}
-		},
-	}
-
-	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base:v.0.0", "kernel version")
-	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
-	cmd.Flags().StringVarP(&seed, "seed", "s", "abc", "seed")
-	cmd.Flags().Int64VarP(&size, "size", "z", 8, "size")
-
-	return cmd
-}
 
 func CreateUniverseInfoAPI() *cobra.Command {
 	var endpoint string
@@ -126,18 +79,24 @@ func CreateListEventsAPI() *cobra.Command {
 	return cmd
 }
 
-func CreateGenStateSeedAPI() *cobra.Command {
-	var kernel_version string
-	var payload string
+func CreateVerifyEventAPI() *cobra.Command {
 	var endpoint string
+	var space_id string
+	var event_result_hash string
 
 	cmd := &cobra.Command{
-		Use:   "seed",
-		Short: "seed",
+		Use:   "verify",
+		Short: "verify event result",
 		Args:  cobra.NoArgs,
 
 		Run: func(cmd *cobra.Command, args []string) {
-			request := rpc.CreateRequest(swift.PacketTypeStateSeedAPIRequest, endpoint, payload)
+			omap := structure.NewOrderedMap()
+			omap.Set("space_id", space_id)
+			omap.Set("event_hash", event_result_hash)
+
+			payload := omap.Ser()
+
+			request := rpc.CreateRequest(swift.PacketTypeVerifyEventResultRequest, endpoint, payload)
 			response, err := request.Call()
 
 			if err != nil {
@@ -151,9 +110,9 @@ func CreateGenStateSeedAPI() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&kernel_version, "kernel_version", "k", "base:v.0.0", "kernel version")
-	cmd.Flags().StringVarP(&payload, "payload", "p", "", "payload")
 	cmd.Flags().StringVarP(&endpoint, "endpoint", "e", CLI_DEFAULT_ENDPOINT, "endpoint to connect")
+	cmd.Flags().StringVarP(&space_id, "space_id", "s", "", "space_id")
+	cmd.Flags().StringVarP(&event_result_hash, "event_result_hash", "a", "", "size")
 
 	return cmd
 }
@@ -164,10 +123,9 @@ func CreateAPICMD() *cobra.Command {
 		Short: "api",
 	}
 
-	cmd.AddCommand(CreateGenStateSeedAPI())
-	cmd.AddCommand(CreateGenVectorAPI())
 	cmd.AddCommand(CreateUniverseInfoAPI())
 	cmd.AddCommand(CreateListEventsAPI())
+	cmd.AddCommand(CreateVerifyEventAPI())
 
 	return cmd
 }
