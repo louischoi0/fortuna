@@ -3,7 +3,6 @@ package vm
 import (
 	"fortuna/core/model"
 	"fortuna/crypto"
-	"time"
 )
 
 type KernelVersion string
@@ -16,11 +15,11 @@ type StateKernel interface {
 	GenVector(seed string, size int64) *model.StateVector
 	VerifyVector(seed string, vector *model.StateVector) bool
 	RandInt(seed string, minValue int64, maxValue int64) int64
-	GenIndex(seed string, minValue int64, maxValue int64, size uint64) []uint64
+	GenIndex(seed string, minValue uint64, maxValue uint64, size uint64) []uint64
+	GenIndexU(seed string, minValue uint64, maxValue uint64, size uint64) []uint64
 
-	GenStateSeed() (string, string)
-	GenStateSeedPayload(payload string) string
-	VerifySeed(seed string, payload string) bool
+	PayloadIntoSeed(payload string, salt uint64) string
+	VerifySeed(seed string, payload string, salt uint64) bool
 }
 
 func LoadKernel(version KernelVersion) StateKernel {
@@ -32,16 +31,6 @@ func LoadKernel(version KernelVersion) StateKernel {
 }
 
 type BasicStateKernel struct{}
-
-func (ck *BasicStateKernel) GenStateSeedPayload(payload string) string {
-	return ""
-}
-
-func (ck *BasicStateKernel) GenStateSeed() (string, string) {
-	payload := string(time.Now().UnixNano())
-	seed := ck.GenStateSeedPayload(payload)
-	return seed, payload
-}
 
 func (ck *BasicStateKernel) GenVector(seed string, size int64) *model.StateVector {
 	res := make([]int64, size)
@@ -70,11 +59,11 @@ func (ck *BasicStateKernel) VerifyVector(seed string, vec *model.StateVector) bo
 	return true
 }
 
-func (ck *BasicStateKernel) GenIndex(seed string, s int64, e int64, size uint64) []uint64 {
+func (ck *BasicStateKernel) GenIndexU(seed string, s uint64, e uint64, size uint64) []uint64 {
 	res := make([]uint64, size)
 
 	seed_bytes := []byte(seed)
-	rng := crypto.NewCSPRNG(seed_bytes)
+	rng := crypto.NewCSPRNGU(seed_bytes, e)
 
 	for i := range size {
 		v := rng.NextInt64()
@@ -84,6 +73,21 @@ func (ck *BasicStateKernel) GenIndex(seed string, s int64, e int64, size uint64)
 	return res
 }
 
+func (ck *BasicStateKernel) GenIndex(seed string, s uint64, e uint64, size uint64) []uint64 {
+	res := make([]uint64, size)
+
+	seed_bytes := []byte(seed)
+	rng := crypto.NewCSPRNG(seed_bytes)
+
+	for i := range size {
+		v := rng.NextInt64()
+		// TODO: check if v is negative
+		res[i] = uint64((uint64(v) % uint64(e)) + uint64(s))
+	}
+	return res
+}
+
+
 func (ck *BasicStateKernel) RandInt(seed string, s int64, e int64) int64 {
 	seed_bytes := []byte(seed)
 	rng := crypto.NewCSPRNG(seed_bytes)
@@ -92,6 +96,11 @@ func (ck *BasicStateKernel) RandInt(seed string, s int64, e int64) int64 {
 	return (v % e) + s
 }
 
-func (ck *BasicStateKernel) VerifySeed(seed string, payload string) bool {
-	return true
+func (ck *BasicStateKernel) VerifySeed(seed string, payload string, salt uint64) bool {
+	return ck.PayloadIntoSeed(payload, salt) == seed
 }
+
+func (ck *BasicStateKernel) PayloadIntoSeed(payload string, salt uint64) string {
+	return ""
+}
+

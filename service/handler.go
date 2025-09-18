@@ -133,9 +133,11 @@ func (o *Oracle) RegisterHandlers() error {
 			return o.swift.SendErrorResponse(ctx, "payload must have key: space_id")
 		}
 
+		salt, ok := omap.UInt64("salt")
+
 		syn := o.GetSynapse(spaceID)
 		machine, err := syn.LoadMachine(vm.KernelVersion(kernelVersion))
-		seed := machine.StateKernel.GenStateSeedPayload(payload)
+		seed := machine.StateKernel.PayloadIntoSeed(payload, salt)
 		buffer, err := json.Marshal(seed)
 
 		util.EncodeInt64Array([]int64{1, 2, 3})

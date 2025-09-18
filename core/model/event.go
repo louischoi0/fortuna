@@ -482,6 +482,7 @@ type EventResult struct {
 	Result                   string               `json:"result"`
 	RefMachineStateTimestamp uint64               `json:"ref_machine_state_timestamp"`
 	RefMachineID             string               `json:"ref_machine_id"`
+	Salt			 uint64		      `json:"salt"`
 	Err                      *EventExecutionError `json:"error"`
 }
 

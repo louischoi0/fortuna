@@ -44,8 +44,8 @@ func NewBasicStateMachine(space *model.Space, stateCount int64) *StateMachine {
 }
 
 func (machine *StateMachine) EmitEventResult(event *model.Event) (*model.EventResult, error) {
-	er := EXEC_INTERFACE(machine, event, machine.StateKernel)
-	machine.OnEmit(er)
+	er, salt := EXEC_INTERFACE(machine, event, machine.StateKernel)
+	machine.OnEmit(er, salt)
 
 	return er, nil
 }
@@ -58,8 +58,12 @@ func (machine *StateMachine) ExecuteEvent(state *model.StateVector, tx interface
 	return nil, nil
 }
 
+func (machine *StateMachine) GetSalt() uint64 {
+	return uint64(util.Now())
+}
+
 func (machine *StateMachine) GenState(size int64) (*model.StateVector, string) {
-	machine.StateSeed, _ = machine.StateKernel.GenStateSeed()
+	machine.StateSeed, _ = machine.GenStateSeed()
 	machine.State = machine.StateKernel.GenVector(machine.StateSeed, size)
 
 	return machine.State, machine.StateSeed
@@ -143,12 +147,20 @@ func (m *StateMachine) InitMachineState() *model.Transaction {
 }
 
 
-func (machine *StateMachine) OnEmit(res *model.EventResult) {
+func (machine *StateMachine) OnEmit(res *model.EventResult, salt uint64) {
 	if machine.InitStateTransaction == nil {
 		log.Fatalf("machine state was not initilized")
 	}
 
 	res.RefMachineStateTimestamp = machine.InitStateTransaction.Timestamp
 	res.RefMachineID = machine.ID
+	res.Salt = salt
 }
 
+func (machine *StateMachine) GenStateSeed() (string, string) {
+	payload := string(time.Now().UnixNano())
+	salt := uint64(0)
+	seed := machine.StateKernel.PayloadIntoSeed(payload, salt)
+
+	return seed, payload
+}

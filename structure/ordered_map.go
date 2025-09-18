@@ -41,6 +41,14 @@ func (om *OrderedMap) Get(key string) (interface{}, bool) {
 	return value, exists
 }
 
+func (om *OrderedMap) UInt64(key string) (uint64, bool) {
+	value, ok := om.Get(key)
+	if !ok {
+		return 0, false
+	}
+	return value.(uint64), true
+}
+
 func (om *OrderedMap) Int64(key string) (int64, bool) {
 	value, ok := om.Get(key)
 	if !ok {
